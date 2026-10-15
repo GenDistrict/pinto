@@ -49,32 +49,6 @@ test.afterAll(async () => {
   await app?.close();
 });
 
-test('clear image saves pending notes and stays empty after restart', async () => {
-  test.setTimeout(90000);
-  await page.getByRole('button', { name: '예시 이미지로 둘러보기' }).click();
-  await expect(page.getByTestId('stage')).toBeVisible();
-  const p = await at(400, 350);
-  await page.mouse.click(p.x, p.y);
-  await page.getByRole('textbox', { name: '수정 지시', exact: true }).fill('닫기 직전 입력도 보관');
-  await page.getByRole('button', { name: '이미지 닫기', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
-  await expect(page.getByTestId('stage')).toHaveCount(0);
-  await expect(page.locator('.recent-grid button').first()).toContainText('1개의 지시');
-  await app.close();
-  await launch(true);
-  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
-  await page.locator('.recent-grid button').first().click();
-  await expect(page.getByTestId('stage')).toBeVisible();
-  await expect(page.getByRole('button', { name: '실행 취소', exact: true })).toBeDisabled();
-  const restored = await page.evaluate(async () => {
-    const recent = await window.pinto.recent();
-    return (await window.pinto.openRecent(recent[0].id)).document;
-  });
-  expect(restored.notes[0].text).toBe('닫기 직전 입력도 보관');
-  await page.getByRole('button', { name: '이미지 닫기', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
-  expect(failures).toEqual([]);
-});
 test('welcome, point, rectangle, multiple targets, copy and export', async () => {
   await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
   await page.screenshot({ path: path.join(root, 'test-results/pinto-welcome.png') });
@@ -473,5 +447,34 @@ test('five explicit tools, ellipse resizing and line endpoints survive a restart
   await page.getByRole('button', { name: '지시 복사', exact: false }).click();
   await expect(page.getByRole('button', { name: '지시 복사', exact: false })).toBeEnabled();
   expect(await app.evaluate(async ({ clipboard }) => await clipboard.readText())).toBe(text);
+  expect(failures).toEqual([]);
+});
+
+test('clear image saves pending notes and stays empty after restart', async () => {
+  test.setTimeout(90000);
+  if (await page.getByTestId('stage').count())
+    await page.getByRole('button', { name: '이미지 닫기', exact: true }).click();
+  await page.getByRole('button', { name: '예시 이미지로 둘러보기' }).click();
+  await expect(page.getByTestId('stage')).toBeVisible();
+  const p = await at(400, 350);
+  await page.mouse.click(p.x, p.y);
+  await page.getByRole('textbox', { name: '수정 지시', exact: true }).fill('닫기 직전 입력도 보관');
+  await page.getByRole('button', { name: '이미지 닫기', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
+  await expect(page.getByTestId('stage')).toHaveCount(0);
+  await expect(page.locator('.recent-grid button').first()).toContainText('1개의 지시');
+  await app.close();
+  await launch(true);
+  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
+  await page.locator('.recent-grid button').first().click();
+  await expect(page.getByTestId('stage')).toBeVisible();
+  await expect(page.getByRole('button', { name: '실행 취소', exact: true })).toBeDisabled();
+  const restored = await page.evaluate(async () => {
+    const recent = await window.pinto.recent();
+    return (await window.pinto.openRecent(recent[0].id)).document;
+  });
+  expect(restored.notes[0].text).toBe('닫기 직전 입력도 보관');
+  await page.getByRole('button', { name: '이미지 닫기', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '여기, 이렇게.' })).toBeVisible();
   expect(failures).toEqual([]);
 });
