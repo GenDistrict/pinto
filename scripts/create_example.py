@@ -1,0 +1,43 @@
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageFont
+
+root=Path(__file__).resolve().parents[1]
+assets=root/'assets'
+assets.mkdir(exist_ok=True)
+def font(size,bold=False): return ImageFont.truetype('C:/Windows/Fonts/'+('arialbd.ttf' if bold else 'arial.ttf'),size)
+im=Image.new('RGB',(1440,960),'#f7f8f4'); d=ImageDraw.Draw(im)
+d.rectangle((0,0,1440,80),fill='#ffffff')
+d.text((48,24),'fieldwork',font=font(27,True),fill='#243c31')
+for x,t in [(277,'Overview'),(402,'Projects'),(518,'Resources')]: d.text((x,31),t,font=font(16),fill='#70786c')
+d.rounded_rectangle((1233,23,1394,58),radius=8,fill='#294d3c'); d.text((1266,31),'New project',font=font(15,True),fill='white')
+d.text((74,128),'YOUR CREATIVE WORKSPACE',font=font(12,True),fill='#7d8b6d')
+d.text((70,166),'A little space for big ideas.',font=font(43,True),fill='#25372b')
+d.text((73,232),'Keep your thoughts together. Make something that matters.',font=font(19),fill='#7c8277')
+d.rounded_rectangle((70,297,960,642),radius=18,fill='#e4e9dc')
+d.ellipse((598,339,899,633),fill='#ced8c1')
+d.rounded_rectangle((172,385,461,579),radius=12,fill='#a1b392')
+d.rounded_rectangle((215,346,486,543),radius=9,fill='#f9faf4')
+for y,w in [(392,191),(421,145),(450,177)]: d.rounded_rectangle((245,y,245+w,y+8),radius=3,fill='#c1cbb3')
+d.rounded_rectangle((583,476,838,509),radius=5,fill='#3c5a43')
+d.ellipse((736,373,811,448),fill='#e2d49a')
+d.text((1001,309),'This week',font=font(23,True),fill='#25372b')
+for y,title,sub,c in [(365,'Brand exploration','6 notes to review','#dce4ce'),(461,'Website refresh','Ready for feedback','#eee0c9'),(557,'A new direction','Start with a sketch','#d8e2e3')]:
+ d.rounded_rectangle((1000,y,1052,y+52),radius=12,fill=c)
+ d.text((1069,y+2),title,font=font(17,True),fill='#354a37')
+ d.text((1069,y+29),sub,font=font(14),fill='#818778')
+d.text((73,696),'Recent projects',font=font(24,True),fill='#25372b')
+d.text((1241,702),'View all  >',font=font(15),fill='#6c7b5f')
+for x,title,sub,c in [(70,'Everyday objects','A study in simple things','#e6eadb'),(514,'Open spaces','Room for a new perspective','#e6dfd0'),(958,'Small beginnings','Ideas worth keeping','#dce5df')]:
+ d.rounded_rectangle((x,749,x+410,901),radius=12,fill='#ffffff',outline='#e1e5db',width=1)
+ d.rounded_rectangle((x+19,770,x+115,879),radius=7,fill=c)
+ d.ellipse((x+39,790,x+95,846),fill='#adbca2')
+ d.text((x+134,786),title,font=font(19,True),fill='#354a37')
+ d.text((x+134,823),sub,font=font(13),fill='#818778')
+ d.text((x+134,856),'PROJECT / 2026',font=font(10),fill='#a0a793')
+im.save(assets/'example.png')
+icon=Image.new('RGBA',(256,256),(0,0,0,0)); p=ImageDraw.Draw(icon)
+p.rounded_rectangle((20,26,236,218),radius=68,fill='#c64b28')
+p.polygon([(51,184),(51,249),(121,206)],fill='#c64b28')
+p.ellipse((92,84,164,156),fill=(0,0,0,0)); p.ellipse((114,106,142,134),fill='#c64b28')
+icon.save(assets/'icon.png'); icon.save(assets/'icon.ico',sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)])
+print('PINTO example and app icons created.')

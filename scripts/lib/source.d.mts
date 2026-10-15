@@ -1,0 +1,11 @@
+export type Snapshot = Record<string, string>;
+export type SourceChange = { path: string; action: 'copy' | 'remove' };
+export type Conflict = { path: string; local: string | null; base: string | null; incoming: string | null };
+export function sourceSnapshot(root: string): Promise<Snapshot>;
+export function initializeBaseline(root: string): Promise<void>;
+export function changes(root: string): Promise<{ path: string; change: 'added' | 'removed' | 'modified' }[]>;
+export function compareSnapshots(base: Snapshot, local: Snapshot, incoming: Snapshot): { changes: SourceChange[]; conflicts: Conflict[] };
+export function updatePlan(root: string, incomingRoot: string): Promise<{ root: string; incomingRoot: string; version: string; changes: SourceChange[]; conflicts: Conflict[]; local: Snapshot; incoming: Snapshot }>;
+export function backup(root: string): Promise<{ id: string; directory: string }>;
+export function applyUpdate(root: string, incomingRoot: string): Promise<{ status: 'conflicts'; conflicts: Conflict[]; message: string } | { status: 'updated'; version: string; backup: string; preservedLocalChanges: boolean }>;
+export function restore(root: string, id: string): Promise<{ status: 'restored'; backup: string; safetyBackup: string }>;

@@ -1,0 +1,30 @@
+import type { AppInfo, Bootstrap, Document, ImageSource, OpenDocument, Recent } from './model';
+export interface PintoAPI {
+  bootstrap(): Promise<Bootstrap>;
+  info(): Promise<AppInfo>;
+  pickImage(): Promise<ImageSource | null>;
+  importFile(file: File): Promise<ImageSource>;
+  clipboardImage(): Promise<ImageSource | null>;
+  example(): Promise<ImageSource>;
+  createDocument(input: { token: string; dataUrl: string }): Promise<OpenDocument>;
+  saveDocument(doc: Document): Promise<void>;
+  closeDocument(): Promise<void>;
+  openRecent(id: string): Promise<OpenDocument>;
+  recent(): Promise<Recent[]>;
+  copyInstructions(doc: Document): Promise<number>;
+  exportInstructions(doc: Document): Promise<boolean>;
+  copyModificationGuide(): Promise<void>;
+  chooseWorkspace(id?: string): Promise<{ info: AppInfo; opened?: OpenDocument } | null>;
+  revealSource(): Promise<void>;
+  revealReference(id: string): Promise<void>;
+  ready(): Promise<void>;
+  closeReady(): Promise<void>;
+  onImage(callback: (source: ImageSource) => void): () => void;
+  onBeforeClose(callback: () => void): () => void;
+  onEdit(callback: (command: 'undo' | 'redo') => void): () => void;
+}
+declare global {
+  interface Window {
+    pinto: PintoAPI;
+  }
+}

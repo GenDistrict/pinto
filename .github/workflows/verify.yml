@@ -1,0 +1,38 @@
+name: Verify PINTO
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm, macos-15-intel, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.18.0'
+          cache: npm
+      - run: npm ci
+      - run: node node_modules/electron/install.js
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
+      - run: npm run doctor -- --json
+      - run: npm run test:e2e
+      - name: Verify install output without desktop shortcut
+        run: node scripts/setup.mjs --no-shortcut --no-launch
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-${{ matrix.os }}
+          path: |
+            test-results/
+            .pinto/install-result.json
+          include-hidden-files: true
