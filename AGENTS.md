@@ -14,6 +14,8 @@ PINTO는 Windows·macOS용 로컬 이미지 지시 편집기입니다. 사용자
 
 ## 구조와 변경 위치
 
+- Multi-image work: `src/core/collection.ts` (stable image numbers, shared/reference targets and formatting), `src/main/collections.ts` (atomic collection metadata), `src/renderer/CollectionPanel.tsx` (thumbnails and shared instructions). Collections are stored separately in user data `collections.json`; original single-image document schemas 1/2/3 remain compatible. Never renumber surviving images or silently remove shared references. User-requested shared instructions for explicit image targets are distinct from the retired legacy single-image global instruction field.
+
 - `src/renderer/App.tsx`: 화면 구성, 파일 열기·저장·복사 흐름, 메뉴.
 - `src/renderer/Canvas.tsx`: 네모·동그라미·점·선·자유도형, 복수 대상, 확대·이동, 위치별 입력.
 - `src/renderer/styles.css`, `theme.css`: 배치, 크기, 색상.

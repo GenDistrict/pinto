@@ -138,6 +138,16 @@ export class DocumentStore {
       return { document: doc, imageUrl: `data:image/png;base64,${png.toString('base64')}` };
     });
   }
+  async readDocument(id: string): Promise<Document> {
+    await this.queue;
+    const value: unknown = JSON.parse(
+      await fs.readFile(path.join(this.directory(id), 'annotations.json'), 'utf8'),
+    );
+    validateDocument(value);
+    if (value.id !== id) throw new Error(tr('m199'));
+    value.referencePath = path.join(this.directory(id), 'reference.png');
+    return value;
+  }
   async save(value: unknown): Promise<Document> {
     validateDocument(value);
     const input = structuredClone(value);

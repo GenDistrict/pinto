@@ -6,6 +6,12 @@ const api: PintoAPI = {
   info: () => invoke('info'),
   setLanguage: (locale) => invoke('set-language', locale),
   pickImage: () => invoke('pick-image'),
+  pickImages: () => invoke('pick-images'),
+  readPickedImage: (token) => invoke('read-picked-image', token),
+  collection: () => invoke('collection'),
+  activateImage: (id) => invoke('activate-image', id),
+  removeImage: (id) => invoke('remove-image', id),
+  saveSharedInstructions: (id, instructions) => invoke('shared-instructions', id, instructions),
   importFile: (file) => invoke('import-file', webUtils.getPathForFile(file)),
   clipboardImage: () => invoke('clipboard-image'),
   example: () => invoke('example'),
@@ -31,6 +37,11 @@ const api: PintoAPI = {
     const listener = () => callback();
     ipcRenderer.on('pinto:before-close', listener);
     return () => ipcRenderer.removeListener('pinto:before-close', listener);
+  },
+  onOpenImages: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('pinto:open-images', listener);
+    return () => ipcRenderer.removeListener('pinto:open-images', listener);
   },
   onEdit: (callback) => {
     const listener = (_: unknown, command: 'undo' | 'redo') => callback(command);

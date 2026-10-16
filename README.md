@@ -58,6 +58,18 @@ Examples use the actual localized UI, sample image, and notes. See [internationa
 
 Images are stored automatically. **More options → Change image storage folder** changes that location; it does not connect an AI account. Limits: 64 MB per image, 16,000 px per side, 64 million pixels total.
 
+## Multi-image work
+
+![Multiple images and a reference instruction](docs/screenshots/multi-image.png)
+
+Open or drop several images together (up to 20), then switch using the thumbnails. Use **Add images** to append to the current work; **Open** starts another work. Each image keeps its own annotations and undo history while switching.
+
+Check the images to target, then click **Add instruction for selected images**. Shared instructions save automatically. Choose an optional reference image—for example, apply Image 1's colors to Image 2. **Copy all instructions** and TXT export include every image's distinct path, dimensions, original-pixel coordinates, per-image notes, and shared/reference instructions. Even identical filenames are distinguished by stable image numbers and paths.
+
+**Close work** saves the group; reopen it from Recent work. Removing a thumbnail only removes its membership, not its stored image or notes. Images used by a shared instruction must be removed from that instruction first. Numbers do not change after removal. If a file fails to import, successfully imported files are kept and the failure is reported. Change the storage folder from a single-image work before adding more images.
+
+The agent performs the actual edits. In a new conversation without local file access, provide all the referenced originals.
+
 ## Make it yours
 
 Ask your agent to change font sizes, shortcuts, or instruction formatting. In a new session, use **More options → Copy customization guide** to share source location and commands. Personal modifications are not automatically overwritten.

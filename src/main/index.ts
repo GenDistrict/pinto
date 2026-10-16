@@ -4,6 +4,13 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DocumentStore, atomicWrite } from './storage';
+import { Collections } from './collections';
+import {
+  MAX_IMAGES,
+  formatCollectionInstructions,
+  collectionInstructionCount,
+  type CollectionView,
+} from '../core/collection';
 import { parseLaunchOptions, readLaunchOptions, type LaunchKey } from '../core/arguments';
 import {
   formatInstructions,
@@ -28,6 +35,97 @@ app.setName('PINTO');
 if (option('--data-dir')) app.setPath('userData', path.resolve(option('--data-dir')!));
 else app.setPath('userData', path.join(app.getPath('appData'), 'PINTO'));
 const store = new DocumentStore(app.getPath('userData'));
+const collections = new Collections(path.join(app.getPath('userData'), 'collections.json'));
+const pickedImages = new Map<string, string>();
+const thumbnails = new Map<string, string>();
+async function collectionView(): Promise<CollectionView | null> {
+  await collections.settled();
+  const collection = collections.current();
+  if (!collection) return null;
+  const images = [];
+  for (const entry of collection.images) {
+    const doc = await store.readDocument(entry.id);
+    let thumbnail = thumbnails.get(entry.id);
+    if (!thumbnail) {
+      const raw = await fs.readFile(doc.referencePath);
+      const scale = Math.min(120 / doc.width, 80 / doc.height);
+      thumbnail = nativeImage
+        .createFromBuffer(raw)
+        .resize({
+          width: Math.max(1, Math.round(doc.width * scale)),
+          height: Math.max(1, Math.round(doc.height * scale)),
+        })
+        .toDataURL();
+      thumbnails.set(entry.id, thumbnail);
+      if (thumbnails.size > 100) thumbnails.delete(thumbnails.keys().next().value!);
+    }
+    images.push({
+      id: doc.id,
+      number: entry.number,
+      name: doc.name,
+      thumbnail,
+      noteCount: instructionCount(doc),
+    });
+  }
+  return { collection, images };
+}
+async function recentWorks() {
+  await collections.settled();
+  const recent = await store.recent();
+  const seen = new Set<string>();
+  const result = [];
+  for (const entry of recent) {
+    const c = collections.forImage(entry.id);
+    if (!c || c.images.length === 1) {
+      result.push(
+        c
+          ? {
+              ...entry,
+              noteCount: entry.noteCount + c.instructions.filter((r) => r.text.trim()).length,
+            }
+          : entry,
+      );
+      continue;
+    }
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    let count = c.instructions.filter((r) => r.text.trim()).length;
+    for (const image of c.images) {
+      try {
+        count += instructionCount(await store.readDocument(image.id));
+      } catch {
+        /* Keep the group discoverable; opening reports the missing image. */
+      }
+    }
+    result.push({
+      ...entry,
+      imageCount: c.images.length,
+      noteCount: count,
+      updatedAt: c.updatedAt && c.updatedAt > entry.updatedAt ? c.updatedAt : entry.updatedAt,
+    });
+  }
+  return result.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+async function outputInstructions(value: unknown) {
+  const doc = await store.save(value);
+  await collections.settled();
+  const c = collections.current();
+  if (c && (c.images.length > 1 || c.instructions.length > 0)) {
+    if (!c.images.some((i) => i.id === doc.id)) throw new Error(tr('batchInvalid'));
+    const docs = [];
+    for (const image of c.images) {
+      const d = await store.readDocument(image.id);
+      await fs.access(d.referencePath);
+      docs.push(d);
+    }
+    return {
+      text: formatCollectionInstructions(c, docs),
+      count: collectionInstructionCount(c, docs),
+      name: doc.name,
+    };
+  }
+  return { text: formatInstructions(doc), count: instructionCount(doc), name: doc.name };
+}
 let win: BrowserWindow | null = null;
 let allowClose = false,
   rendererReady = false,
@@ -150,7 +248,7 @@ function setupIPC() {
   handle('bootstrap', async (): Promise<Bootstrap> => {
     const result: Bootstrap = {
       info: info(),
-      recent: await store.recent(),
+      recent: await recentWorks(),
       warning: store.warning,
     };
     if (pendingImage) {
@@ -164,6 +262,8 @@ function setupIPC() {
     } else if (store.lastId && !args.includes('--no-restore')) {
       try {
         result.opened = await store.load(store.lastId);
+        await collections.restore(result.opened.document.id);
+        result.collection = await collectionView();
       } catch {
         result.warning = tr('m183');
       }
@@ -171,6 +271,39 @@ function setupIPC() {
     return result;
   });
   handle('pick-image', pickImage);
+  handle('pick-images', async () => {
+    const result = await dialog.showOpenDialog(win!, {
+      title: tr('m179'),
+      properties: ['openFile', 'multiSelections'],
+      filters: [{ name: tr('m180'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+    });
+    if (result.canceled) return [];
+    if (result.filePaths.length > MAX_IMAGES)
+      throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
+    pickedImages.clear();
+    return result.filePaths.map((file) => {
+      const token = randomUUID();
+      pickedImages.set(token, file);
+      return { token, name: path.basename(file) };
+    });
+  });
+  handle('read-picked-image', async (token: string) => {
+    const file = pickedImages.get(token);
+    if (!file) throw new Error(tr('m185'));
+    pickedImages.delete(token);
+    return fileSource(file);
+  });
+  handle('collection', collectionView);
+  handle('shared-instructions', (id, rules) => collections.rules(id, rules));
+  handle('activate-image', async (id: string) => {
+    if (!collections.current()?.images.some((i) => i.id === id))
+      throw new Error(tr('batchInvalid'));
+    return store.load(id);
+  });
+  handle('remove-image', async (id: string) => {
+    const c = await collections.remove(id);
+    return store.load(c.images.find((i) => i.id === store.lastId)?.id || c.images[0].id);
+  });
   handle('import-file', fileSource);
   handle('clipboard-image', clipboardImage);
   handle('example', () =>
@@ -178,54 +311,67 @@ function setupIPC() {
       path.join(root, getLocale() === 'es' ? 'assets/example-es.png' : 'assets/example.png'),
     ),
   );
-  handle('create-document', async (input: { token?: unknown; dataUrl?: unknown }) => {
-    if (
-      !input ||
-      typeof input.token !== 'string' ||
-      typeof input.dataUrl !== 'string' ||
-      !input.dataUrl.startsWith('data:image/png;base64,') ||
-      input.dataUrl.length > 100_000_000
-    )
-      throw new Error(tr('m184'));
-    const meta = imports.get(input.token);
-    if (!meta) throw new Error(tr('m185'));
-    const png = Buffer.from(input.dataUrl.slice(22), 'base64');
-    if (mimeOf(png) !== 'image/png' || png.length < 24) throw new Error(tr('m186'));
-    const width = png.readUInt32BE(16),
-      height = png.readUInt32BE(20);
-    if (!width || !height || width > 16000 || height > 16000 || width * height > 64_000_000)
-      throw new Error(tr('m001'));
-    const image = nativeImage.createFromBuffer(png);
-    if (image.isEmpty()) throw new Error(tr('m186'));
-    const opened = await store.create(meta.name, png, width, height, meta.sourcePath);
-    imports.delete(input.token);
+  handle(
+    'create-document',
+    async (input: { token?: unknown; dataUrl?: unknown; append?: boolean }) => {
+      if (input?.append && (collections.current()?.images.length || 0) >= MAX_IMAGES)
+        throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
+      if (
+        !input ||
+        typeof input.token !== 'string' ||
+        typeof input.dataUrl !== 'string' ||
+        !input.dataUrl.startsWith('data:image/png;base64,') ||
+        input.dataUrl.length > 100_000_000
+      )
+        throw new Error(tr('m184'));
+      const meta = imports.get(input.token);
+      if (!meta) throw new Error(tr('m185'));
+      const png = Buffer.from(input.dataUrl.slice(22), 'base64');
+      if (mimeOf(png) !== 'image/png' || png.length < 24) throw new Error(tr('m186'));
+      const width = png.readUInt32BE(16),
+        height = png.readUInt32BE(20);
+      if (!width || !height || width > 16000 || height > 16000 || width * height > 64_000_000)
+        throw new Error(tr('m001'));
+      const image = nativeImage.createFromBuffer(png);
+      if (image.isEmpty()) throw new Error(tr('m186'));
+      const opened = await store.create(meta.name, png, width, height, meta.sourcePath);
+      imports.delete(input.token);
+      await collections.adopt(opened.document.id, !!input.append);
+      return opened;
+    },
+  );
+  handle('save', (value) => store.save(value).then(() => {}));
+  handle('close-document', async () => {
+    await store.closeDocument();
+    await collections.close();
+  });
+  handle('recent', recentWorks);
+  handle('open-recent', async (id: string) => {
+    const opened = await store.load(id);
+    await collections.restore(id);
     return opened;
   });
-  handle('save', (value) => store.save(value).then(() => {}));
-  handle('close-document', () => store.closeDocument());
-  handle('recent', () => store.recent());
-  handle('open-recent', (id: string) => store.load(id));
   handle('copy', async (value) => {
-    const doc = await store.save(value),
-      count = instructionCount(doc);
+    const { text, count } = await outputInstructions(value);
     if (!count) throw new Error(tr('m187'));
-    await clipboard.writeText(formatInstructions(doc));
+    await clipboard.writeText(text);
     return count;
   });
   handle('export', async (value) => {
-    const doc = await store.save(value);
-    if (!instructionCount(doc)) throw new Error(tr('m187'));
+    const { text, count, name } = await outputInstructions(value);
+    if (!count) throw new Error(tr('m187'));
     const result = await dialog.showSaveDialog(win!, {
       title: tr('m188'),
-      defaultPath: tr('m189', { p0: path.parse(doc.name).name }),
+      defaultPath: tr('m189', { p0: path.parse(name).name }),
       filters: [{ name: tr('m190'), extensions: ['txt'] }],
     });
     if (result.canceled || !result.filePath) return false;
-    await atomicWrite(result.filePath, formatInstructions(doc));
+    await atomicWrite(result.filePath, text);
     return true;
   });
   handle('copy-modification', () => clipboard.writeText(info().modificationGuide));
   handle('workspace', async (id?: string) => {
+    if ((collections.current()?.images.length || 0) > 1) throw new Error(tr('batchWorkspace'));
     const result = await dialog.showOpenDialog(win!, {
       title: tr('m191'),
       properties: ['openDirectory', 'createDirectory'],
@@ -233,6 +379,8 @@ function setupIPC() {
     });
     if (result.canceled) return null;
     const opened = await store.setWorkspace(result.filePaths[0], id);
+    if (id && opened && opened.document.id !== id)
+      await collections.replace(id, opened.document.id);
     return { info: info(), opened };
   });
   handle('reveal-source', async () => {
@@ -286,7 +434,11 @@ function buildMenu() {
       {
         label: tr('m193'),
         submenu: [
-          { label: tr('m055'), accelerator: 'CmdOrCtrl+O', click: () => void sendImage() },
+          {
+            label: tr('m055'),
+            accelerator: 'CmdOrCtrl+O',
+            click: () => win?.webContents.send('pinto:open-images'),
+          },
           { label: tr('m077'), role: 'close' },
         ],
       },
@@ -404,6 +556,7 @@ else {
       }
       setLocale(option('--language') || savedLocale || app.getLocale());
       await store.init(option('--workspace') ? path.resolve(option('--workspace')!) : undefined);
+      await collections.init();
       if (process.platform === 'darwin') app.dock?.setIcon(path.join(root, 'assets/icon.png'));
       setupIPC();
       createWindow();

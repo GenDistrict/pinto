@@ -23,6 +23,7 @@ export type Document = {
 export type OpenDocument = { document: Document; imageUrl: string };
 export type ImageSource = { token: string; name: string; dataUrl: string };
 export type Recent = {
+  imageCount?: number;
   id: string;
   name: string;
   width: number;
@@ -40,6 +41,7 @@ export type AppInfo = {
   modificationGuide: string;
 };
 export type Bootstrap = {
+  collection?: import('./collection').CollectionView | null;
   info: AppInfo;
   recent: Recent[];
   opened?: OpenDocument;

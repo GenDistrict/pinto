@@ -1,5 +1,16 @@
 # PINTO 변경 기록
 
+## 0.3.0 — Multi-image work / Varias imágenes / 여러 이미지
+
+- Open or drop up to 20 images as one work; append images and switch via thumbnails. Keep per-image annotations and undo history during switching.
+- Add auto-saved instructions scoped to selected images, with an optional reference image. Copy/export every path, image number, original-pixel coordinate, and shared instruction together.
+- Preserve stable image numbers, restore whole groups from Recent work, and prevent removing images that are still referenced. Partial import failures retain successful imports.
+- English, Spanish and Korean UI and instructions are included. Single-image document formats remain compatible.
+
+Ahora puedes trabajar con hasta 20 imágenes, añadir instrucciones compartidas y elegir una referencia. Se conservan los números, las notas y los grupos al reiniciar.
+
+최대 20장을 묶어 이미지별 지시와 공통·참고 지시를 작성하고 한 번에 복사할 수 있습니다. 기존 단일 이미지 데이터는 그대로 유지됩니다.
+
 ## 0.2.0 — English / Español / 한국어
 
 - Added English and Spanish UI, native menu/dialog labels, app errors, help, clipboard/TXT instructions, and installation/customization messages.

@@ -55,6 +55,18 @@ La demostración utiliza la aplicación real, la imagen de ejemplo y las instruc
 
 Las imágenes se guardan automáticamente. **Más opciones → Cambiar carpeta de imágenes** elige la ubicación; no conecta una cuenta de IA. Límites: 64 MB por imagen, 16.000 px por lado y 64 millones de píxeles en total.
 
+## Trabajar con varias imágenes
+
+![Varias imágenes y una instrucción de referencia](docs/screenshots/multi-image.png)
+
+Abre o arrastra varias imágenes juntas (hasta 20) y cambia entre ellas con las miniaturas. **Añadir imágenes** agrega archivos al trabajo actual; **Abrir** inicia otro trabajo. Cada imagen conserva sus anotaciones y su historial de deshacer al cambiar.
+
+Marca las imágenes de destino y pulsa **Añadir instrucción a las imágenes seleccionadas**. Las instrucciones compartidas se guardan automáticamente. Puedes elegir una referencia: por ejemplo, aplicar los colores de Imagen 1 a Imagen 2. **Copiar todas las instrucciones** y la exportación TXT incluyen rutas distintas, tamaños, coordenadas originales, notas por imagen e instrucciones compartidas/de referencia. Los números estables y las rutas distinguen incluso archivos con el mismo nombre.
+
+**Cerrar trabajo** guarda el conjunto, que puedes recuperar desde Trabajos recientes. Quitar una miniatura no elimina el archivo ni sus notas. Si una instrucción utiliza esa imagen, primero modifica o elimina la instrucción. Los números no cambian al quitar imágenes. Si falla una importación, se conservan los archivos importados y se informa del error. Cambia la carpeta de almacenamiento desde un trabajo de una sola imagen antes de añadir más.
+
+La edición real la realiza el agente. En una conversación sin acceso a archivos locales, proporciona todos los originales utilizados.
+
 ## Personalízalo
 
 Pide al mismo agente que cambie el tamaño de letra, los atajos o el formato de las instrucciones. En otra sesión, usa **Más opciones → Copiar guía de personalización** para compartir la ubicación del código y los comandos. Las modificaciones personales no se sobrescriben automáticamente.

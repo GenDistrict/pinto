@@ -7,12 +7,17 @@ export function useDocumentHistory() {
   const past = useRef<Document[]>([]),
     future = useRef<Document[]>([]);
   const grouping = useRef({ key: '', at: 0 });
+  const perImage = useRef(new Map<string, { past: Document[]; future: Document[] }>());
   const [, redraw] = useState(0);
-  const reset = useCallback((value: Document | null) => {
+  const reset = useCallback((value: Document | null, remember = false) => {
+    if (remember && ref.current)
+      perImage.current.set(ref.current.id, { past: past.current, future: future.current });
+    if (!remember) perImage.current.clear();
+    const previous = value ? perImage.current.get(value.id) : undefined;
     ref.current = value;
     setDoc(value);
-    past.current = [];
-    future.current = [];
+    past.current = previous?.past || [];
+    future.current = previous?.future || [];
     grouping.current.key = '';
     redraw((n) => n + 1);
   }, []);

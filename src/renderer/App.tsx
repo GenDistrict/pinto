@@ -35,6 +35,8 @@ import {
 } from '../core/model';
 import { useDocumentHistory } from './history';
 import { Canvas } from './Canvas';
+import { CollectionPanel } from './CollectionPanel';
+import { MAX_IMAGES, type CollectionView, type SharedInstruction } from '../core/collection';
 
 function Mark({ size = 34 }: { size?: number }) {
   return (
@@ -94,6 +96,45 @@ export function App() {
     [recentsOpen, setRecentsOpen] = useState(false);
   const [drop, setDrop] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
+  const [collection, setCollection] = useState<CollectionView | null>(null);
+  const collectionRef = useRef<CollectionView | null>(null);
+  const sharedQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const showCollection = useCallback((value: CollectionView | null) => {
+    collectionRef.current = value;
+    setCollection(value);
+  }, []);
+  const refreshCollection = useCallback(
+    async () => showCollection(await window.pinto.collection()),
+    [showCollection],
+  );
+  const changeShared = (instructions: SharedInstruction[]) => {
+    const value = collectionRef.current;
+    if (!value) return;
+    showCollection({ ...value, collection: { ...value.collection, instructions } });
+    const next = sharedQueue.current
+      .catch(() => {})
+      .then(() => window.pinto.saveSharedInstructions(value.collection.id, instructions));
+    sharedQueue.current = next;
+    setSaveState('saving');
+    void next
+      .then(() => {
+        if (sharedQueue.current === next) setSaveState('saved');
+      })
+      .catch((e) => {
+        setSaveState('error');
+        notify(errorMessage(e), true);
+      });
+  };
+  const multi =
+    !!collection && (collection.images.length > 1 || collection.collection.instructions.length > 0);
+  const totalInstructions = collection
+    ? collection.images.reduce(
+        (n, i) => n + (i.id === doc?.id ? instructionCount(doc) : i.noteCount),
+        0,
+      ) + collection.collection.instructions.filter((r) => r.text.trim()).length
+    : doc
+      ? instructionCount(doc)
+      : 0;
   const savedDoc = useRef<Document | null>(null),
     saveQueue = useRef<Promise<unknown>>(Promise.resolve()),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -145,11 +186,21 @@ export function App() {
   const flush = useCallback(async () => {
     if (docRef.current) await save(docRef.current);
     await saveQueue.current;
+    await sharedQueue.current.catch(async () => {
+      const value = collectionRef.current;
+      if (!value) throw new Error(tr('batchInvalid'));
+      const retry = window.pinto.saveSharedInstructions(
+        value.collection.id,
+        value.collection.instructions,
+      );
+      sharedQueue.current = retry;
+      await retry;
+    });
   }, [docRef, save]);
   const opened = useCallback(
     (value: OpenDocument) => {
       savedDoc.current = value.document;
-      reset(value.document);
+      reset(value.document, true);
       setImageUrl(value.imageUrl);
       setActiveId(null);
       setAdding(false);
@@ -159,17 +210,18 @@ export function App() {
   );
   const refreshRecent = useCallback(async () => setRecent(await window.pinto.recent()), []);
   const importSource = useCallback(
-    async (source: ImageSource) => {
+    async (source: ImageSource, append = false) => {
       const dataUrl = await normalizeImage(source);
-      opened(await window.pinto.createDocument({ token: source.token, dataUrl }));
+      opened(await window.pinto.createDocument({ token: source.token, dataUrl, append }));
+      await refreshCollection();
       setInfo(await window.pinto.info());
       await refreshRecent();
     },
-    [opened, refreshRecent],
+    [opened, refreshRecent, refreshCollection],
   );
   const operation = useCallback(
     async (message: string, fn: () => Promise<void>) => {
-      if (busyRef.current) return;
+      if (busyRef.current || copyingRef.current) return;
       busyRef.current = true;
       setBusy(message);
       setMenu(false);
@@ -188,11 +240,53 @@ export function App() {
   const openImage = useCallback(
     () =>
       operation(tr('m004'), async () => {
-        const source = await window.pinto.pickImage();
-        if (source) await importSource(source);
+        const files = await window.pinto.pickImages();
+        let success = 0;
+        const errors: string[] = [];
+        for (const file of files) {
+          try {
+            await importSource(await window.pinto.readPickedImage(file.token), success > 0);
+            success++;
+          } catch (e) {
+            errors.push(`${file.name}: ${errorMessage(e)}`);
+          }
+        }
+        if (errors.length) notify(tr('batchImportErrors', { details: errors.join('\n') }), true);
       }),
-    [operation, importSource],
+    [operation, importSource, notify],
   );
+  useEffect(
+    () =>
+      window.pinto.onOpenImages(() => {
+        void openImage();
+      }),
+    [openImage],
+  );
+  const addImages = () =>
+    operation(tr('m004'), async () => {
+      const files = await window.pinto.pickImages();
+      if (files.length + (collectionRef.current?.images.length || 0) > MAX_IMAGES)
+        throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
+      const errors: string[] = [];
+      for (const file of files) {
+        try {
+          await importSource(await window.pinto.readPickedImage(file.token), true);
+        } catch (e) {
+          errors.push(`${file.name}: ${errorMessage(e)}`);
+        }
+      }
+      if (errors.length) notify(tr('batchImportErrors', { details: errors.join('\n') }), true);
+    });
+  const switchImage = (id: string) =>
+    operation(tr('m011'), async () => {
+      opened(await window.pinto.activateImage(id));
+      await refreshCollection();
+    });
+  const removeImage = (id: string) =>
+    operation(tr('m005'), async () => {
+      opened(await window.pinto.removeImage(id));
+      await refreshCollection();
+    });
   const closeImage = async () => {
     if (busyRef.current || copyingRef.current || !docRef.current) return;
     closingDocument.current = true;
@@ -200,6 +294,7 @@ export function App() {
       await operation(tr('m005'), async () => {
         await window.pinto.closeDocument();
         reset(null);
+        showCollection(null);
         savedDoc.current = null;
         setImageUrl('');
         setActiveId(null);
@@ -230,6 +325,7 @@ export function App() {
   const openRecent = (id: string) =>
     operation(tr('m011'), async () => {
       opened(await window.pinto.openRecent(id));
+      await refreshCollection();
       setRecentsOpen(false);
     });
   const copy = useCallback(async () => {
@@ -242,7 +338,8 @@ export function App() {
       if (!value) return;
       const count = await window.pinto.copyInstructions(value);
       setSaveState('saved');
-      notify(tr('m012', { p0: count }));
+      const images = collectionRef.current?.images.length || 1;
+      notify(images > 1 ? tr('batchCopied', { images, count }) : tr('m012', { p0: count }));
     } catch (error) {
       notify(errorMessage(error), true);
     } finally {
@@ -277,6 +374,7 @@ export function App() {
         setLocale(result.info.locale);
         setInfo(result.info);
         setRecent(result.recent);
+        showCollection(result.collection || null);
         if (result.initialImage) await importSource(result.initialImage);
         else if (result.opened) opened(result.opened);
         if (result.warning) notify(result.warning, true);
@@ -453,6 +551,7 @@ export function App() {
       if (result) {
         setInfo(result.info);
         if (result.opened) opened(result.opened);
+        await refreshCollection();
         await refreshRecent();
         notify(tr('m016'));
       }
@@ -491,9 +590,23 @@ export function App() {
       onDrop={(e) => {
         e.preventDefault();
         setDrop(false);
-        const file = e.dataTransfer.files[0];
-        if (file)
-          void operation(tr('m004'), async () => importSource(await window.pinto.importFile(file)));
+        const files = Array.from(e.dataTransfer.files);
+        if (files.length)
+          void operation(tr('m004'), async () => {
+            if (files.length > MAX_IMAGES) throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
+            let success = 0;
+            const errors: string[] = [];
+            for (const file of files) {
+              try {
+                await importSource(await window.pinto.importFile(file), success > 0);
+                success++;
+              } catch (e) {
+                errors.push(`${file.name}: ${errorMessage(e)}`);
+              }
+            }
+            if (errors.length)
+              notify(tr('batchImportErrors', { details: errors.join('\n') }), true);
+          });
       }}
     >
       <header className="app-header">
@@ -527,13 +640,22 @@ export function App() {
           {doc && (
             <>
               <button
+                className="icon-button"
+                aria-label={tr('batchAdd')}
+                title={tr('batchAdd')}
+                disabled={!!busy || copying}
+                onClick={() => void addImages()}
+              >
+                <ImagePlus size={18} />
+              </button>
+              <button
                 className="secondary-button"
                 onClick={() => void closeImage()}
                 disabled={!!busy || copying}
                 title={tr('m022')}
               >
                 <X size={16} />
-                <span>{tr('m023')}</span>
+                <span>{tr(multi ? 'batchClose' : 'm023')}</span>
               </button>
               <button
                 className="icon-button"
@@ -566,11 +688,11 @@ export function App() {
               </button>
               <button
                 className="primary-button copy-button"
-                disabled={!instructionCount(doc) || copying}
+                disabled={!totalInstructions || copying || !!busy}
                 onClick={() => void copy()}
               >
                 {copying ? <LoaderCircle size={16} className="spin" /> : <Copy size={16} />}
-                {tr('m028')}
+                {tr(multi ? 'batchCopy' : 'm028')}
                 <kbd>{command} ↵</kbd>
               </button>
             </>
@@ -585,10 +707,23 @@ export function App() {
           </button>
         </div>
       </header>
+      {doc && multi && collection && (
+        <CollectionPanel
+          key={collection.collection.id}
+          view={collection}
+          active={doc.id}
+          busy={!!busy || copying}
+          onSwitch={(id) => void switchImage(id)}
+          onRemove={(id) => void removeImage(id)}
+          onAdd={() => void addImages()}
+          onRules={changeShared}
+        />
+      )}
       {doc ? (
         <main className="editor-layout">
           <div className="workspace">
             <Canvas
+              key={doc.id}
               doc={doc}
               imageUrl={imageUrl}
               activeId={activeId}
@@ -824,7 +959,10 @@ export function App() {
                     <span>
                       <strong>{r.name}</strong>
                       <small>
-                        {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', { count: r.noteCount })}{' '}
+                        {r.imageCount && <>{tr('batchImages', { count: r.imageCount })} · </>}
+                        {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', {
+                          count: r.noteCount,
+                        })}{' '}
                         · {r.width} × {r.height}
                       </small>
                     </span>
@@ -1026,6 +1164,7 @@ export function App() {
                         <span>
                           <strong>{r.name}</strong>
                           <small>
+                            {r.imageCount && <>{tr('batchImages', { count: r.imageCount })} · </>}
                             {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', {
                               count: r.noteCount,
                             })}{' '}

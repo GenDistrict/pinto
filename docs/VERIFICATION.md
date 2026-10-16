@@ -1,5 +1,13 @@
 # PINTO 검증 기록
 
+## 0.3.0 — Multi-image work
+
+Windows x64: type check and production build passed; 15 core/catalog/persistence tests passed. All 10 Electron scenarios passed, including the existing single-image editing and localization flows. After the final compact-window styling and native Open-menu integration, both multi-image scenarios were rerun and passed.
+
+Verified: multi-file picker and real-file drop; different dimensions and identical filenames; saving a typed note before switching; per-image undo availability; selected-image shared instructions and explicit reference images; combined clipboard/TXT output; restarting and reopening a closed group; one Recent work entry per group; preventing dangling references; successful copying after a rejected removal; retaining successful imports when another file fails; and the copy button remaining inside an 860 px window. Collection storage rejects invalid rules and excess images, preserves stable numbers, and restores shared references. macOS was not physically tested in this session.
+
+![Multi-image work](screenshots/multi-image.png)
+
 ## 0.2.0 — 2026-10-16
 
 Windows x64: type check, production build, 13 core/catalog tests, and all 8 Electron scenarios passed. The multilingual scenario exercised English, Spanish, and Korean UI switching; translated clipboard output, native menus, export dialog titles, and native errors; an 860 px window; restarting with a saved Spanish preference; and reopening user notes without translation or data loss.
