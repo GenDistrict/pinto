@@ -4,11 +4,13 @@
 
 ![PINTO](assets/brand/logo.svg)
 
-**Point at what you mean. Let your AI do the editing.**
+**Precise image-editing instructions for the desktop coding agent you already use.**
 
-PINTO is a small, source-editable desktop app for Windows and macOS. Open an image, mark what should change, write instructions, and copy them into your coding agent. The copied text includes the reference image path and original-pixel coordinates.
+Use PINTO alongside your agent in **thread0**, **Claude Code**, **Codex**, or another coding agent running on your computer. PINTO is a small, source-editable desktop app for Windows and macOS that helps you communicate exactly what you want changed in an image.
 
-PINTO prepares instructions. Your agent performs the edit using image generation or suitable tools it has available. If it can read the referenced local file, you do not need to attach it again. In a new conversation without local file access, attach the original too.
+Open your images, mark the parts you want to change, and add notes. PINTO packages the file paths, original-pixel coordinates, selected regions, and reference-image relationships into instructions you can copy and paste into the agent you already use.
+
+**PINTO makes the request precise. Your coding agent performs the edit**, using image generation or suitable tools it has available. If the agent can read the referenced local files, you do not need to attach the images again. In a new conversation without local file access, attach the originals too.
 
 ## Install with your AI
 

@@ -4,11 +4,13 @@
 
 ![PINTO](assets/brand/logo.svg)
 
-**Señala lo que quieres cambiar. Deja que tu IA lo edite.**
+**Instrucciones precisas de edición de imágenes para el agente de programación que ya usas en tu equipo.**
 
-PINTO es una pequeña aplicación de escritorio para Windows y macOS cuyo código puedes personalizar. Abre una imagen, marca lo que quieras cambiar, escribe instrucciones y cópialas a tu agente de programación. El texto incluye la ruta de la imagen de referencia y las coordenadas de sus píxeles originales.
+Usa PINTO junto con tu agente en **thread0**, **Claude Code**, **Codex** u otro agente de programación que se ejecute en tu equipo. PINTO es una pequeña aplicación de escritorio para Windows y macOS, con código personalizable, que te ayuda a comunicar exactamente qué quieres cambiar en una imagen.
 
-PINTO prepara las instrucciones. Tu agente realiza la edición mediante generación de imágenes u otras herramientas disponibles. Si puede leer el archivo local indicado, no necesitas adjuntarlo de nuevo. En una conversación nueva sin acceso al archivo, adjunta también el original.
+Abre tus imágenes, marca las partes que quieras cambiar y añade notas. PINTO reúne las rutas de los archivos, las coordenadas de los píxeles originales, las zonas seleccionadas y las relaciones entre imágenes de referencia en instrucciones que puedes copiar y pegar en el agente que ya utilizas.
+
+**PINTO hace precisa la solicitud. Tu agente de programación realiza la edición**, mediante generación de imágenes u otras herramientas adecuadas que tenga disponibles. Si puede leer los archivos locales indicados, no necesitas adjuntar las imágenes de nuevo. En una conversación nueva sin acceso a esos archivos, adjunta también los originales.
 
 ## Instalar con tu IA
 
