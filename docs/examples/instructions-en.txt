@@ -1,0 +1,14 @@
+Apply the instructions below to the original image in this conversation or the attached image.
+If you can access local files, open the following reference image first.
+
+Image name: example.png
+Image: /path/to/reference.png
+Size: 1440×960 px
+Coordinates: top-left origin (0, 0), x increases rightward, y downward
+Region: (x, y, width, height)
+
+1. Region (1240, 25, 155, 40)
+   Make this button larger.
+
+2. Point (760, 550)
+   Use a warmer background.

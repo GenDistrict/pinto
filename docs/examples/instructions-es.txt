@@ -1,0 +1,14 @@
+Aplica las siguientes instrucciones a la imagen original de esta conversación o a la imagen adjunta.
+Si puedes acceder a archivos locales, abre primero la siguiente imagen de referencia.
+
+Nombre de la imagen: example-es.png
+Imagen: /path/to/reference.png
+Tamaño: 1440×960 px
+Coordenadas: origen superior izquierdo (0, 0), x hacia la derecha, y hacia abajo
+Zona: (x, y, ancho, alto)
+
+1. Zona (1240, 25, 155, 40)
+   Haz este botón más grande.
+
+2. Punto (760, 550)
+   Usa un fondo más cálido.

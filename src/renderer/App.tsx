@@ -1,3 +1,4 @@
+import { tr, setLocale, getLocale } from '../core/i18n.mjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowDownToLine,
@@ -61,17 +62,17 @@ async function normalizeImage(source: ImageSource): Promise<string> {
     image.naturalHeight > 16000 ||
     image.naturalWidth * image.naturalHeight > 64_000_000
   )
-    throw new Error('이미지는 한 변 16,000px, 총 6,400만 픽셀 이하로 열어 주세요.');
+    throw new Error(tr('m001'));
   const canvas = document.createElement('canvas');
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('이미지를 표시할 수 없어요.');
+  if (!ctx) throw new Error(tr('m002'));
   ctx.drawImage(image, 0, 0);
   const result = canvas.toDataURL('image/png');
   canvas.width = 0;
   canvas.height = 0;
-  if (!result.startsWith('data:image/png')) throw new Error('이미지 변환에 실패했어요.');
+  if (!result.startsWith('data:image/png')) throw new Error(tr('m003'));
   return result;
 }
 
@@ -92,6 +93,7 @@ export function App() {
     [help, setHelp] = useState(false),
     [recentsOpen, setRecentsOpen] = useState(false);
   const [drop, setDrop] = useState(false);
+  const [changingLanguage, setChangingLanguage] = useState(false);
   const savedDoc = useRef<Document | null>(null),
     saveQueue = useRef<Promise<unknown>>(Promise.resolve()),
     toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,6 +103,23 @@ export function App() {
     copyingRef = useRef(false),
     booted = useRef(false);
   const command = info?.platform === 'darwin' ? '⌘' : 'Ctrl';
+  useEffect(() => {
+    document.documentElement.lang = getLocale();
+    document.title = tr('uiTitle');
+  }, [info?.locale]);
+  const changeLanguage = async (locale: string) => {
+    setChangingLanguage(true);
+    try {
+      const next = await window.pinto.setLanguage(locale);
+      setLocale(next.locale);
+      setInfo(next);
+      setToast(null);
+    } catch (error) {
+      notify(errorMessage(error), true);
+    } finally {
+      setChangingLanguage(false);
+    }
+  };
   const notify = useCallback((text: string, error = false) => {
     setToast({ text, error });
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -168,7 +187,7 @@ export function App() {
   );
   const openImage = useCallback(
     () =>
-      operation('이미지를 열고 있어요', async () => {
+      operation(tr('m004'), async () => {
         const source = await window.pinto.pickImage();
         if (source) await importSource(source);
       }),
@@ -178,7 +197,7 @@ export function App() {
     if (busyRef.current || copyingRef.current || !docRef.current) return;
     closingDocument.current = true;
     try {
-      await operation('이미지를 닫고 있어요.', async () => {
+      await operation(tr('m005'), async () => {
         await window.pinto.closeDocument();
         reset(null);
         savedDoc.current = null;
@@ -188,7 +207,7 @@ export function App() {
         setSidebar(false);
         setSaveState('saved');
         await refreshRecent();
-        notify('이미지를 닫았어요. 최근 작업에서 다시 열 수 있어요.');
+        notify(tr('m006'));
       });
     } finally {
       closingDocument.current = false;
@@ -196,20 +215,20 @@ export function App() {
   };
   const pasteImage = useCallback(
     () =>
-      operation('이미지를 붙여넣고 있어요', async () => {
+      operation(tr('m007'), async () => {
         const source = await window.pinto.clipboardImage();
         if (source) await importSource(source);
-        else notify('클립보드에 이미지가 없어요. 이미지를 복사한 뒤 다시 시도해 주세요.');
+        else notify(tr('m008'));
       }),
     [operation, importSource, notify],
   );
   const openExample = () =>
-    operation('예시 이미지를 준비하고 있어요', async () => {
+    operation(tr('m009'), async () => {
       await importSource(await window.pinto.example());
-      notify('바꿀 곳을 클릭하거나 드래그해 보세요.');
+      notify(tr('m010'));
     });
   const openRecent = (id: string) =>
-    operation('작업을 열고 있어요', async () => {
+    operation(tr('m011'), async () => {
       opened(await window.pinto.openRecent(id));
       setRecentsOpen(false);
     });
@@ -223,7 +242,7 @@ export function App() {
       if (!value) return;
       const count = await window.pinto.copyInstructions(value);
       setSaveState('saved');
-      notify(`지시 ${count}개 복사했어요. 원본을 만든 AI 대화에 붙여넣으세요.`);
+      notify(tr('m012', { p0: count }));
     } catch (error) {
       notify(errorMessage(error), true);
     } finally {
@@ -255,6 +274,7 @@ export function App() {
     void (async () => {
       try {
         const result = await window.pinto.bootstrap();
+        setLocale(result.info.locale);
         setInfo(result.info);
         setRecent(result.recent);
         if (result.initialImage) await importSource(result.initialImage);
@@ -281,14 +301,14 @@ export function App() {
       window.pinto.onBeforeClose(() => {
         void flush()
           .then(() => window.pinto.closeReady())
-          .catch((error) => notify(`저장하지 못해 창을 유지했어요. ${errorMessage(error)}`, true));
+          .catch((error) => notify(tr('m013', { p0: errorMessage(error) }), true));
       }),
     [flush, notify],
   );
   useEffect(
     () =>
       window.pinto.onImage((source) => {
-        void operation('이미지를 열고 있어요', () => importSource(source));
+        void operation(tr('m004'), () => importSource(source));
       }),
     [operation, importSource],
   );
@@ -421,26 +441,26 @@ export function App() {
   const modifyGuide = async () => {
     try {
       await window.pinto.copyModificationGuide();
-      notify('앱 수정 안내를 복사했어요. AI에게 원하는 변경을 함께 말해 주세요.');
+      notify(tr('m014'));
       setMenu(false);
     } catch (error) {
       notify(errorMessage(error), true);
     }
   };
   const chooseWorkspace = () =>
-    operation('이미지 보관 위치를 변경하고 있어요', async () => {
+    operation(tr('m015'), async () => {
       const result = await window.pinto.chooseWorkspace(docRef.current?.id);
       if (result) {
         setInfo(result.info);
         if (result.opened) opened(result.opened);
         await refreshRecent();
-        notify('이미지와 메모의 보관 위치를 변경했어요.');
+        notify(tr('m016'));
       }
     });
   const exportText = () =>
-    operation('지시문을 저장하고 있어요', async () => {
+    operation(tr('m017'), async () => {
       if (docRef.current && (await window.pinto.exportInstructions(docRef.current)))
-        notify('지시문을 저장했어요.');
+        notify(tr('m018'));
     });
   const showRecents = async () => {
     try {
@@ -473,9 +493,7 @@ export function App() {
         setDrop(false);
         const file = e.dataTransfer.files[0];
         if (file)
-          void operation('이미지를 열고 있어요', async () =>
-            importSource(await window.pinto.importFile(file)),
-          );
+          void operation(tr('m004'), async () => importSource(await window.pinto.importFile(file)));
       }}
     >
       <header className="app-header">
@@ -494,17 +512,17 @@ export function App() {
               </small>
             </>
           ) : (
-            <span className="brand-tagline">작은 표시, 명확한 지시.</span>
+            <span className="brand-tagline">{tr('m019')}</span>
           )}
         </div>
         <div className="header-actions">
           <button
             className="secondary-button open-header"
             onClick={() => void openImage()}
-            title={`이미지 열기 (${command}+O)`}
+            title={tr('m020', { p0: command })}
           >
             <FolderOpen size={16} />
-            <span>열기</span>
+            <span>{tr('m021')}</span>
           </button>
           {doc && (
             <>
@@ -512,16 +530,16 @@ export function App() {
                 className="secondary-button"
                 onClick={() => void closeImage()}
                 disabled={!!busy || copying}
-                title="이미지를 닫고 시작 화면으로 돌아가기 · 작업은 자동 저장됩니다"
+                title={tr('m022')}
               >
                 <X size={16} />
-                <span>이미지 닫기</span>
+                <span>{tr('m023')}</span>
               </button>
               <button
                 className="icon-button"
                 disabled={!history.canUndo}
                 onClick={undo}
-                aria-label="실행 취소"
+                aria-label={tr('m024')}
                 title={`${command}+Z`}
               >
                 <Undo2 size={17} />
@@ -530,32 +548,36 @@ export function App() {
                 className="icon-button"
                 disabled={!history.canRedo}
                 onClick={redo}
-                aria-label="다시 실행"
+                aria-label={tr('m025')}
               >
                 <Redo2 size={17} />
               </button>
               <button
                 className={`secondary-button notes-toggle ${sidebar ? 'on' : ''}`}
                 onClick={() => setSidebar(!sidebar)}
-                aria-label="지시 목록"
+                aria-label={tr('m026')}
                 aria-expanded={sidebar}
               >
                 <List size={16} />
-                <span>지시 {doc.notes.length}</span>
+                <span>
+                  {tr('m027')}
+                  {doc.notes.length}
+                </span>
               </button>
               <button
                 className="primary-button copy-button"
                 disabled={!instructionCount(doc) || copying}
                 onClick={() => void copy()}
               >
-                {copying ? <LoaderCircle size={16} className="spin" /> : <Copy size={16} />}지시
-                복사<kbd>{command} ↵</kbd>
+                {copying ? <LoaderCircle size={16} className="spin" /> : <Copy size={16} />}
+                {tr('m028')}
+                <kbd>{command} ↵</kbd>
               </button>
             </>
           )}
           <button
             className="icon-button"
-            aria-label="더 보기"
+            aria-label={tr('m029')}
             aria-expanded={menu}
             onClick={() => setMenu(!menu)}
           >
@@ -602,10 +624,8 @@ export function App() {
             <div className="handoff-guide">
               <Copy size={18} />
               <div>
-                <strong>지시를 복사해 원본을 만든 AI 대화에 붙여넣으세요.</strong>
-                <p>
-                  새 대화라면 원본 이미지도 함께 전달하세요. 공통 조건은 그 대화에서 덧붙이면 돼요.
-                </p>
+                <strong>{tr('m030')}</strong>
+                <p>{tr('m031')}</p>
               </div>
               <button
                 className="secondary-button"
@@ -614,10 +634,10 @@ export function App() {
                     .revealReference(doc.id)
                     .catch((e) => notify(errorMessage(e), true))
                 }
-                title="표시가 없는 참고 이미지 파일의 위치를 엽니다"
+                title={tr('m032')}
               >
                 <FileImage size={15} />
-                이미지 파일 보기
+                {tr('m033')}
               </button>
             </div>
           </div>
@@ -625,11 +645,12 @@ export function App() {
             <aside className="notes-panel">
               <div className="panel-header">
                 <h2>
-                  남긴 지시 <span>{doc.notes.length}</span>
+                  {tr('m034')}
+                  <span>{doc.notes.length}</span>
                 </h2>
                 <button
                   className="icon-button small"
-                  aria-label="지시 목록 닫기"
+                  aria-label={tr('m035')}
                   onClick={() => setSidebar(false)}
                 >
                   <X size={16} />
@@ -638,9 +659,9 @@ export function App() {
               <div className="notes-scroll">
                 {doc.globalInstruction.trim() && (
                   <details className="legacy-instruction">
-                    <summary>이전 버전에서 작성한 추가 지시</summary>
+                    <summary>{tr('m036')}</summary>
                     <textarea
-                      aria-label="이전 버전 추가 지시"
+                      aria-label={tr('m037')}
                       value={doc.globalInstruction}
                       maxLength={20000}
                       onChange={(e) =>
@@ -650,7 +671,7 @@ export function App() {
                         )
                       }
                     />
-                    <small>기존 내용은 복사할 때 함께 포함됩니다.</small>
+                    <small>{tr('m038')}</small>
                   </details>
                 )}
                 {doc.notes.length ? (
@@ -668,29 +689,29 @@ export function App() {
                       >
                         <span className="number-badge">{i + 1}</span>
                         <div>
-                          <p>{note.text.trim() || '지시를 입력하고 있어요…'}</p>
+                          <p>{note.text.trim() || tr('m039')}</p>
                           <small>
                             {note.targets.length > 1
-                              ? `대상 ${note.targets.length}개`
+                              ? tr('m040', { p0: note.targets.length })
                               : {
-                                  rect: '네모로 표시한 곳',
-                                  ellipse: '동그라미로 표시한 곳',
-                                  point: '점으로 표시한 곳',
-                                  line: '선으로 표시한 곳',
-                                  stroke: '자유도형으로 표시한 곳',
+                                  rect: tr('m041'),
+                                  ellipse: tr('m042'),
+                                  point: tr('m043'),
+                                  line: tr('m044'),
+                                  stroke: tr('m045'),
                                 }[note.targets[0]?.kind || 'point']}
                           </small>
                         </div>
                       </button>
                       <button
                         className="list-delete"
-                        aria-label={`지시 ${i + 1} 삭제`}
+                        aria-label={tr('m046', { p0: i + 1 })}
                         onClick={() => deleteNote(note.id)}
                       >
                         <Trash2 size={13} />
                       </button>
                       <details>
-                        <summary>좌표 보기</summary>
+                        <summary>{tr('m047')}</summary>
                         {note.targets.map((t) => (
                           <code key={t.id}>{targetDescription(t)}</code>
                         ))}
@@ -701,15 +722,16 @@ export function App() {
                   <div className="panel-empty">
                     <MapPin size={26} />
                     <p>
-                      이미지 위에 콕 찍고
-                      <br />첫 지시를 남겨보세요.
+                      {tr('m048')}
+                      <br />
+                      {tr('m049')}
                     </p>
                   </div>
                 )}
               </div>
               <div className="panel-footer">
                 <CheckCheck size={15} />
-                <span>위치는 지시와 함께 복사돼요.</span>
+                <span>{tr('m050')}</span>
               </div>
             </aside>
           )}
@@ -720,11 +742,11 @@ export function App() {
             <span className="tiny-dot" />
             POINT. NOTE. COPY.
           </div>
-          <h1>여기, 이렇게.</h1>
+          <h1>{tr('m051')}</h1>
           <p className="welcome-description">
-            이미지 위에 콕. 바꿀 곳을 짚고,
+            {tr('m052')}
             <br />
-            AI에게 하고 싶은 말을 남겨보세요.
+            {tr('m053')}
           </p>
           <div className="welcome-card">
             <div className="demo-paper">
@@ -732,7 +754,7 @@ export function App() {
                 <i />
                 <i />
                 <i />
-                <span>your next idea</span>
+                <span>{tr('demoTitle')}</span>
               </div>
               <div className="paper-content">
                 <div className="paper-illustration">
@@ -749,43 +771,49 @@ export function App() {
                   <i />
                   <i />
                   <div className="mini-button">
-                    Start here<span className="demo-badge">1</span>
+                    {tr('demoStart')}
+                    <span className="demo-badge">1</span>
                   </div>
                 </div>
               </div>
               <div className="demo-comment">
-                <span>1</span>이 버튼을 조금 더 크게.<span className="demo-cursor">↖</span>
+                <span>1</span>
+                {tr('m054')}
+                <span className="demo-cursor">↖</span>
               </div>
             </div>
             <div className="welcome-buttons">
               <button className="primary-button" onClick={() => void openImage()}>
                 <ImagePlus size={18} />
-                이미지 열기
+                {tr('m055')}
                 <ArrowRight size={17} />
               </button>
               <button className="secondary-button" onClick={() => void pasteImage()}>
                 <Clipboard size={17} />
-                붙여넣기<kbd>{command} V</kbd>
+                {tr('m056')}
+                <kbd>{command} V</kbd>
               </button>
             </div>
             <p className="drop-instruction">
-              또는 이 창에 이미지를 끌어다 놓으세요 <span>PNG · JPG · WEBP</span>
+              {tr('m057')}
+              <span>PNG · JPG · WEBP</span>
             </p>
           </div>
           <button className="sample-link" onClick={() => void openExample()}>
-            예시 이미지로 둘러보기
+            {tr('m058')}
             <ChevronRight size={15} />
           </button>
           <p className="welcome-handoff">
-            지시를 복사해 원본을 만든 AI 대화에 붙여넣으세요.
-            <br />새 대화라면 원본 이미지도 함께 전달하세요.
+            {tr('m030')}
+            <br />
+            {tr('m059')}
           </p>
           {recent.length > 0 && (
             <div className="recent-welcome">
               <div>
-                <h2>이어서 작업하기</h2>
+                <h2>{tr('m060')}</h2>
                 <button onClick={() => void showRecents()}>
-                  모두 보기
+                  {tr('m061')}
                   <ChevronRight size={13} />
                 </button>
               </div>
@@ -796,7 +824,8 @@ export function App() {
                     <span>
                       <strong>{r.name}</strong>
                       <small>
-                        {r.noteCount}개의 지시 · {r.width} × {r.height}
+                        {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', { count: r.noteCount })}{' '}
+                        · {r.width} × {r.height}
                       </small>
                     </span>
                     <ChevronRight size={15} />
@@ -813,27 +842,39 @@ export function App() {
             saveState === 'saving' ? (
               <>
                 <LoaderCircle size={12} className="spin" />
-                저장 중
+                {tr('m063')}
               </>
             ) : saveState === 'error' ? (
               <button onClick={() => void flush().catch((e) => notify(errorMessage(e), true))}>
-                저장 실패 · 다시 시도
+                {tr('m064')}
               </button>
             ) : (
               <>
                 <Check size={12} />
-                자동 저장됨
+                {tr('m065')}
               </>
             )
           ) : (
             <>
-              <span className="tiny-dot" />내 컴퓨터에서, 내 방식대로.
+              <span className="tiny-dot" />
+              {tr('m066')}
             </>
           )}
         </span>
+        <select
+          className="language-select"
+          aria-label="Language / Idioma / 언어"
+          value={info?.locale || getLocale()}
+          disabled={!info || !!busy || copying || changingLanguage}
+          onChange={(event) => void changeLanguage(event.target.value)}
+        >
+          <option value="ko">한국어</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
         <button className="help-link" onClick={() => setHelp(true)}>
           <HelpCircle size={13} />
-          사용 방법
+          {tr('m067')}
         </button>
       </footer>
       {menu && (
@@ -842,15 +883,15 @@ export function App() {
           <div className="app-menu">
             <button onClick={() => void showRecents()}>
               <FileImage size={16} />
-              최근 작업
+              {tr('m068')}
             </button>
             <button disabled={!doc} onClick={() => void exportText()}>
               <ArrowDownToLine size={16} />
-              지시문 TXT로 저장
+              {tr('m069')}
             </button>
             <button onClick={() => void chooseWorkspace()}>
               <FolderOpen size={16} />
-              이미지 보관 폴더 변경
+              {tr('m070')}
             </button>
             {doc && (
               <button
@@ -862,12 +903,13 @@ export function App() {
                 }}
               >
                 <FileImage size={16} />
-                참고 이미지 위치 열기
+                {tr('m071')}
               </button>
             )}
             <hr />
             <button onClick={() => void modifyGuide()}>
-              <Code2 size={16} />앱 수정 안내 복사
+              <Code2 size={16} />
+              {tr('m072')}
             </button>
             <button
               onClick={() => {
@@ -875,7 +917,8 @@ export function App() {
                 setMenu(false);
               }}
             >
-              <FolderOpen size={16} />앱 소스 폴더 열기
+              <FolderOpen size={16} />
+              {tr('m073')}
             </button>
             <button
               onClick={() => {
@@ -884,9 +927,12 @@ export function App() {
               }}
             >
               <HelpCircle size={16} />
-              사용 방법과 단축키
+              {tr('m074')}
             </button>
-            <div className="menu-version">PINTO {info?.version} · 원하는 대로 고쳐 쓰세요.</div>
+            <div className="menu-version">
+              PINTO {info?.version}
+              {tr('m075')}
+            </div>
           </div>
         </>
       )}
@@ -902,12 +948,12 @@ export function App() {
             className="modal"
             role="dialog"
             aria-modal="true"
-            aria-label={help ? 'PINTO 사용 방법' : '최근 작업'}
+            aria-label={help ? tr('m076') : tr('m068')}
             onClick={(e) => e.stopPropagation()}
           >
             <button
               className="modal-close icon-button"
-              aria-label="닫기"
+              aria-label={tr('m077')}
               onClick={() => {
                 setHelp(false);
                 setRecentsOpen(false);
@@ -920,36 +966,37 @@ export function App() {
                 <div className="help-mark">
                   <Mark size={40} />
                 </div>
-                <h2>가리키고, 한 줄 남기세요.</h2>
+                <h2>{tr('m078')}</h2>
                 <p>
-                  위치는 PINTO가 기억할게요.
+                  {tr('m079')}
                   <br />
-                  지시를 복사해 원본을 만든 AI 대화에 붙여넣으세요.
-                  <br />새 대화라면 원본 이미지도 함께 전달하세요.
+                  {tr('m030')}
+                  <br />
+                  {tr('m059')}
                 </p>
                 <div className="shortcut-list">
                   <div>
-                    <span>표시 도구</span>
-                    <strong>네모 · 동그라미 · 점 · 선 · 자유도형</strong>
+                    <span>{tr('m080')}</span>
+                    <strong>{tr('m081')}</strong>
                   </div>
                   <div>
-                    <span>그리기</span>
-                    <strong>점은 클릭, 나머지는 드래그</strong>
+                    <span>{tr('m082')}</span>
+                    <strong>{tr('m083')}</strong>
                   </div>
                   <div>
-                    <span>같은 지시에 대상 추가</span>
-                    <strong>Shift + 클릭·드래그</strong>
+                    <span>{tr('m084')}</span>
+                    <strong>{tr('m085')}</strong>
                   </div>
                   <div>
-                    <span>지시 복사</span>
+                    <span>{tr('m028')}</span>
                     <strong>{command} + Enter</strong>
                   </div>
                   <div>
-                    <span>화면 이동 / 확대</span>
-                    <strong>Space + 드래그 / 휠</strong>
+                    <span>{tr('m086')}</span>
+                    <strong>{tr('m087')}</strong>
                   </div>
                   <div>
-                    <span>실행 취소 / 다시 실행</span>
+                    <span>{tr('m088')}</span>
                     <strong>
                       {command} + Z / {command} + Shift + Z
                     </strong>
@@ -958,10 +1005,10 @@ export function App() {
                 <div className="customize-tip">
                   <Code2 size={19} />
                   <div>
-                    <strong>PINTO도 원하는 대로 바꿔 쓰세요.</strong>
-                    <p>AI에게 글자 크기, 단축키, 지시문 형식을 바꿔달라고 해보세요.</p>
+                    <strong>{tr('m089')}</strong>
+                    <p>{tr('m090')}</p>
                     <button className="text-button" onClick={() => void modifyGuide()}>
-                      앱 수정 안내 복사
+                      {tr('m072')}
                       <Copy size={13} />
                     </button>
                   </div>
@@ -969,8 +1016,8 @@ export function App() {
               </>
             ) : (
               <>
-                <h2>최근 작업</h2>
-                <p>이미지와 남긴 지시를 다시 불러와요.</p>
+                <h2>{tr('m068')}</h2>
+                <p>{tr('m091')}</p>
                 <div className="recent-modal-list">
                   {recent.length ? (
                     recent.map((r) => (
@@ -979,15 +1026,17 @@ export function App() {
                         <span>
                           <strong>{r.name}</strong>
                           <small>
-                            {r.noteCount}개의 지시 ·{' '}
-                            {new Date(r.updatedAt).toLocaleDateString('ko-KR')}
+                            {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', {
+                              count: r.noteCount,
+                            })}{' '}
+                            · {new Date(r.updatedAt).toLocaleDateString(getLocale())}
                           </small>
                         </span>
                         <ChevronRight size={17} />
                       </button>
                     ))
                   ) : (
-                    <p>아직 저장된 작업이 없어요.</p>
+                    <p>{tr('m093')}</p>
                   )}
                 </div>
               </>
@@ -998,8 +1047,8 @@ export function App() {
       {drop && (
         <div className="drop-overlay">
           <ImagePlus size={44} />
-          <strong>여기에 이미지를 놓아주세요.</strong>
-          <span>새로운 지시를 시작해 볼까요?</span>
+          <strong>{tr('m094')}</strong>
+          <span>{tr('m095')}</span>
         </div>
       )}
       {busy && (
@@ -1015,7 +1064,7 @@ export function App() {
         >
           {toast.error ? <HelpCircle size={17} /> : <CheckCheck size={17} />}
           <span>{toast.text}</span>
-          <button onClick={() => setToast(null)} aria-label="알림 닫기">
+          <button onClick={() => setToast(null)} aria-label={tr('m096')}>
             <X size={15} />
           </button>
         </div>

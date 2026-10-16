@@ -1,9 +1,11 @@
+import { tr } from '../../src/core/i18n.mjs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { runNpm, run, writeJSON, cleanEnv } from './runtime.mjs';
 const excluded = new Set([
   'node_modules',
+  'media',
   'dist',
   '.git',
   '.pinto',
@@ -112,10 +114,9 @@ export function compareSnapshots(base, local, incoming) {
   return { changes, conflicts };
 }
 export async function updatePlan(root, incomingRoot) {
-  if (path.resolve(root) === path.resolve(incomingRoot))
-    throw new Error('업데이트 소스는 별도 폴더에 준비해 주세요.');
+  if (path.resolve(root) === path.resolve(incomingRoot)) throw new Error(tr('m217'));
   const pkg = JSON.parse(await fs.readFile(path.join(incomingRoot, 'package.json'), 'utf8'));
-  if (pkg.name !== 'pinto-image-notes') throw new Error('PINTO 소스 폴더가 아닙니다.');
+  if (pkg.name !== 'pinto-image-notes') throw new Error(tr('m218'));
   const base = JSON.parse(await fs.readFile(path.join(root, '.pinto/baseline.json'), 'utf8'));
   const local = await sourceSnapshot(root),
     incoming = await sourceSnapshot(incomingRoot);
@@ -160,7 +161,7 @@ async function ensureClosed(root) {
       } catch {
         continue;
       }
-      throw new Error('PINTO 창을 닫은 뒤 업데이트 또는 복원을 실행해 주세요.');
+      throw new Error(tr('m219'));
     } catch (error) {
       if (error.message.startsWith('PINTO')) throw error;
     }
@@ -189,7 +190,7 @@ export async function applyUpdate(root, incomingRoot) {
     return {
       status: 'conflicts',
       conflicts: plan.conflicts,
-      message: '개인 수정과 새 버전이 같은 파일을 바꿨습니다. 원본 소스는 유지했습니다.',
+      message: tr('m220'),
     };
   const stage = path.join(root, '.pinto/update-stage', randomUUID());
   await copyFiles(root, stage, Object.keys(plan.local));
@@ -208,9 +209,9 @@ export async function applyUpdate(root, incomingRoot) {
   for (const script of ['check', 'test', 'build']) await runNpm(['run', script], options);
   await ensureClosed(root);
   if (JSON.stringify(await sourceSnapshot(root)) !== JSON.stringify(plan.local))
-    throw new Error('검증 중 로컬 소스가 변경되었습니다. 업데이트를 다시 비교해 주세요.');
+    throw new Error(tr('m221'));
   if (JSON.stringify(await sourceSnapshot(incomingRoot)) !== JSON.stringify(plan.incoming))
-    throw new Error('검증 중 새 버전 소스가 변경되었습니다. 업데이트를 다시 비교해 주세요.');
+    throw new Error(tr('m222'));
   const saved = await backup(root),
     swaps = [];
   try {
@@ -249,11 +250,11 @@ export async function applyUpdate(root, incomingRoot) {
         await fs.rename(path.join(saved.directory, swap.name), path.join(root, swap.name));
     }
     await restoreSources(root, saved.directory);
-    throw new Error(`업데이트를 복구했습니다: ${error.message}`);
+    throw new Error(tr('m223', { p0: error.message }));
   }
 }
 export async function restore(root, id) {
-  if (!id || !/^[\w-]+$/.test(id)) throw new Error('백업 ID를 지정하세요.');
+  if (!id || !/^[\w-]+$/.test(id)) throw new Error(tr('m224'));
   await ensureClosed(root);
   const directory = path.join(root, '.pinto/backups', id);
   await fs.access(path.join(directory, 'backup.json'));
@@ -291,6 +292,6 @@ export async function restore(root, id) {
         await fs.rename(path.join(safety.directory, swap.name), path.join(root, swap.name));
     }
     await restoreSources(root, safety.directory);
-    throw new Error(`복원 작업을 취소하고 이전 상태를 유지했습니다: ${error.message}`);
+    throw new Error(tr('m225', { p0: error.message }));
   }
 }

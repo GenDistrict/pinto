@@ -2,6 +2,7 @@ import type { AppInfo, Bootstrap, Document, ImageSource, OpenDocument, Recent } 
 export interface PintoAPI {
   bootstrap(): Promise<Bootstrap>;
   info(): Promise<AppInfo>;
+  setLanguage(locale: string): Promise<AppInfo>;
   pickImage(): Promise<ImageSource | null>;
   importFile(file: File): Promise<ImageSource>;
   clipboardImage(): Promise<ImageSource | null>;

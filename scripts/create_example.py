@@ -1,11 +1,30 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
+import argparse
+parser=argparse.ArgumentParser()
+parser.add_argument('--language',choices=['en','es'],default='en')
+language=parser.parse_args().language
+labels={
+ 'Overview':'Resumen','Projects':'Proyectos','Resources':'Recursos','New project':'Nuevo proyecto',
+ 'YOUR CREATIVE WORKSPACE':'TU ESPACIO CREATIVO','A little space for big ideas.':'Un espacio para grandes ideas.',
+ 'Keep your thoughts together. Make something that matters.':'Organiza tus ideas. Crea algo que importe.',
+ 'This week':'Esta semana','Brand exploration':'Explorar la marca','6 notes to review':'6 notas por revisar',
+ 'Website refresh':'Renovar la web','Ready for feedback':'Listo para comentarios',
+ 'A new direction':'Un nuevo rumbo','Start with a sketch':'Empieza con un boceto',
+ 'Recent projects':'Proyectos recientes','View all  >':'Ver todo  >',
+ 'Everyday objects':'Objetos cotidianos','A study in simple things':'Un estudio de lo sencillo',
+ 'Open spaces':'Espacios abiertos','Room for a new perspective':'Lugar para otra perspectiva',
+ 'Small beginnings':'Pequeños comienzos','Ideas worth keeping':'Ideas para conservar','PROJECT / 2026':'PROYECTO / 2026',
+}
 
 root=Path(__file__).resolve().parents[1]
 assets=root/'assets'
 assets.mkdir(exist_ok=True)
 def font(size,bold=False): return ImageFont.truetype('C:/Windows/Fonts/'+('arialbd.ttf' if bold else 'arial.ttf'),size)
 im=Image.new('RGB',(1440,960),'#f7f8f4'); d=ImageDraw.Draw(im)
+original_text=d.text
+def localized_text(xy,text,*args,**kwargs):return original_text(xy,labels.get(text,text) if language=='es' else text,*args,**kwargs)
+d.text=localized_text
 d.rectangle((0,0,1440,80),fill='#ffffff')
 d.text((48,24),'fieldwork',font=font(27,True),fill='#243c31')
 for x,t in [(277,'Overview'),(402,'Projects'),(518,'Resources')]: d.text((x,31),t,font=font(16),fill='#70786c')
@@ -34,7 +53,7 @@ for x,title,sub,c in [(70,'Everyday objects','A study in simple things','#e6eadb
  d.text((x+134,786),title,font=font(19,True),fill='#354a37')
  d.text((x+134,823),sub,font=font(13),fill='#818778')
  d.text((x+134,856),'PROJECT / 2026',font=font(10),fill='#a0a793')
-im.save(assets/'example.png')
+im.save(assets/('example-es.png' if language=='es' else 'example.png'))
 icon=Image.new('RGBA',(256,256),(0,0,0,0)); p=ImageDraw.Draw(icon)
 p.rounded_rectangle((20,26,236,218),radius=68,fill='#c64b28')
 p.polygon([(51,184),(51,249),(121,206)],fill='#c64b28')

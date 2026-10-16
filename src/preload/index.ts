@@ -4,6 +4,7 @@ const invoke = (name: string, ...args: unknown[]) => ipcRenderer.invoke(`pinto:$
 const api: PintoAPI = {
   bootstrap: () => invoke('bootstrap'),
   info: () => invoke('info'),
+  setLanguage: (locale) => invoke('set-language', locale),
   pickImage: () => invoke('pick-image'),
   importFile: (file) => invoke('import-file', webUtils.getPathForFile(file)),
   clipboardImage: () => invoke('clipboard-image'),

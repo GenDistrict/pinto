@@ -1,3 +1,4 @@
+import { tr } from '../src/core/i18n.mjs';
 import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -33,9 +34,7 @@ export async function launch(extra = []) {
       if (report.status === 'ready' && report.windowReady) {
         await fs.rm(ready, { force: true });
         if (path.resolve(report.sourceRoot).toLowerCase() !== path.resolve(ROOT).toLowerCase())
-          throw new Error(
-            '다른 소스 폴더의 PINTO가 실행 중입니다. 그 창을 닫고 다시 실행해 주세요.',
-          );
+          throw new Error(tr('m204'));
         return report;
       }
     } catch (error) {
@@ -44,7 +43,7 @@ export async function launch(extra = []) {
     if (failure) throw failure;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  throw new Error('앱 화면의 준비 응답을 받지 못했습니다. .pinto/app.log를 확인하세요.');
+  throw new Error(tr('m205'));
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.join(ROOT, 'scripts/launch.mjs')) {
   try {

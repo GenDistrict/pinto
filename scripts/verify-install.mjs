@@ -27,7 +27,7 @@ const env = {
 delete env.ELECTRON_RUN_AS_NODE;
 await run(
   path.join(system, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
-  ['-NoProfile', '-File', path.join(destination, 'install.ps1'), '-NoShortcut', '-NoLaunch'],
+  ['-NoProfile', '-File', path.join(destination, 'install.ps1'), '-Language', 'es', '-NoShortcut', '-NoLaunch'],
   { cwd: destination, env },
 );
 const report = JSON.parse(
@@ -36,6 +36,7 @@ const report = JSON.parse(
 assert.equal(report.status, 'installed');
 assert.equal(report.windowReady, false);
 assert.equal(report.sourceEditable, true);
+assert.equal(report.locale, 'es');
 assert.ok(report.nodePath.startsWith(path.join(destination, '.pinto/runtime')));
 const ready = await new Promise((resolve, reject) => {
   let output = '';
@@ -45,6 +46,8 @@ const ready = await new Promise((resolve, reject) => {
       path.join(destination, 'scripts/launch.mjs'),
       '--isolated',
       '--background',
+      '--language',
+      'es',
       '--data-dir',
       path.join(destination, '.test-data/runtime-data'),
       '--workspace',
@@ -66,8 +69,10 @@ const ready = await new Promise((resolve, reject) => {
 });
 assert.equal(ready.status, 'ready');
 assert.equal(ready.windowReady, true);
+assert.equal(ready.locale, 'es');
+assert.doesNotMatch(ready.assistantMessage, /[가-힣]/);
 assert.equal(ready.sourceRoot, path.resolve(destination));
-assert.match(ready.assistantMessage, /수정/);
+assert.ok(ready.assistantMessage.length > 30);
 // This is the empty, isolated verification instance created above.
 process.kill(ready.pid);
 const summary = {

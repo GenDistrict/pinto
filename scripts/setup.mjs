@@ -1,3 +1,4 @@
+import { tr, setLocale, getLocale } from '../src/core/i18n.mjs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -78,8 +79,7 @@ async function shortcuts() {
 }
 try {
   const status = await diagnose();
-  if (status.status !== 'ok')
-    throw new Error('실행 준비가 끝나지 않았습니다. 설치 스크립트를 먼저 실행하세요.');
+  if (status.status !== 'ok') throw new Error(tr('m208'));
   const launcher = await shortcuts();
   await initializeBaseline(ROOT);
   const extra = [];
@@ -89,26 +89,21 @@ try {
   }
   if (process.argv.includes('--isolated')) extra.push('--isolated');
   if (process.argv.includes('--background')) extra.push('--background');
+  if (option('--language')) extra.push('--language', option('--language'));
   const ready = process.argv.includes('--no-launch')
     ? { status: 'installed', windowReady: false }
     : await launch(extra);
+  if (ready.locale) setLocale(ready.locale);
   const report = {
     ...status,
     ...ready,
+    locale: getLocale(),
     launcher,
     sourceEditable: true,
     modificationGuide: status.modificationGuide,
     modificationPrompt: ready.modificationGuide || '',
-    assistantMessage: ready.windowReady
-      ? '설치했고 앱 창을 열었습니다. PINTO는 로컬 소스를 직접 수정해서 사용할 수 있습니다. 원하는 동작을 말해 주시면 코드를 수정하고 확인한 뒤 다시 실행할 수 있습니다.'
-      : '소스 설치가 완료되었습니다. 앱 실행은 생략했습니다. PINTO의 로컬 소스를 사용자 요청에 맞게 수정할 수 있습니다.',
-    requiredFinalResponse: [
-      '실행 확인 결과',
-      '소스 위치',
-      '실행 방법',
-      '이 앱의 소스를 수정해서 쓸 수 있다는 설명',
-      '글자 크기·단축키·지시문 형식 변경 예시',
-    ],
+    assistantMessage: ready.windowReady ? tr('m209') : tr('m210'),
+    requiredFinalResponse: [tr('m211'), tr('m212'), tr('m213'), tr('m214'), tr('m215')],
   };
   await writeJSON(path.join(ROOT, '.pinto/install-result.json'), report);
   console.log(JSON.stringify(report, null, 2));

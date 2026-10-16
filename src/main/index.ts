@@ -1,3 +1,4 @@
+import { tr, setLocale, getLocale, locales } from '../core/i18n.mjs';
 import { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -45,8 +46,7 @@ async function reportReady() {
     pid: process.pid,
     ...info(),
     sourceEditable: true,
-    assistantMessage:
-      '설치했고 앱 창을 열었습니다. 이 앱은 로컬 소스를 직접 수정해서 사용할 수 있습니다. 원하는 변경을 요청하시면 코드를 수정하고 확인한 뒤 다시 실행할 수 있습니다.',
+    assistantMessage: tr('m163'),
   };
   for (const file of pendingReadyFiles) {
     await atomicWrite(file, JSON.stringify(report, null, 2));
@@ -60,23 +60,24 @@ async function reportReady() {
 }
 function info(): AppInfo {
   return {
+    locale: getLocale(),
     version,
     platform: process.platform,
     sourceRoot: root,
     dataPath: store.dataPath,
     workspace: store.workspace,
     modificationGuide: [
-      '이 PC에 설치된 PINTO의 소스를 사용자 요청에 맞게 수정해 주세요.',
-      `소스 위치: ${root}`,
-      `수정 지침: ${path.join(root, 'AGENTS.md')}`,
-      `실행 환경 정보: ${path.join(root, '.pinto/install-result.json')} (nodePath와 npmCli 참고)`,
-      '위 소스 폴더에서 작업합니다.',
-      '타입 확인: npm run check',
-      '핵심 테스트: npm test',
-      '빌드: npm run build',
-      '실행: npm start',
-      '코드 변경 전에 작업 내용을 확인하고, 이미지·코멘트 데이터와 기존 개인 수정은 보존해 주세요.',
-      '원하는 변경: ',
+      tr('m164'),
+      tr('m165', { p0: root }),
+      tr('m166', { p0: path.join(root, 'AGENTS.md') }),
+      tr('m167', { p0: path.join(root, '.pinto/install-result.json') }),
+      tr('m168'),
+      tr('m169'),
+      tr('m170'),
+      tr('m171'),
+      tr('m172'),
+      tr('m173'),
+      tr('m174'),
     ].join('\n'),
   };
 }
@@ -86,10 +87,10 @@ function mimeOf(buffer: Buffer) {
   if (buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) return 'image/jpeg';
   if (buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP')
     return 'image/webp';
-  throw new Error('PNG, JPEG, WebP 이미지를 열어 주세요.');
+  throw new Error(tr('m175'));
 }
 function source(buffer: Buffer, name: string, sourcePath?: string): ImageSource {
-  if (buffer.length > 64 * 1024 * 1024) throw new Error('64MB 이하의 이미지를 열어 주세요.');
+  if (buffer.length > 64 * 1024 * 1024) throw new Error(tr('m176'));
   const mime = mimeOf(buffer),
     token = randomUUID();
   if (imports.size > 10) imports.delete(imports.keys().next().value!);
@@ -97,19 +98,17 @@ function source(buffer: Buffer, name: string, sourcePath?: string): ImageSource 
   return { token, name, dataUrl: `data:${mime};base64,${buffer.toString('base64')}` };
 }
 async function fileSource(file: unknown) {
-  if (typeof file !== 'string' || !file || file.length > 32768)
-    throw new Error('이미지 경로를 확인해 주세요.');
+  if (typeof file !== 'string' || !file || file.length > 32768) throw new Error(tr('m177'));
   const absolute = path.resolve(file),
     stat = await fs.stat(absolute);
-  if (!stat.isFile() || stat.size > 64 * 1024 * 1024)
-    throw new Error('64MB 이하의 이미지 파일을 열어 주세요.');
+  if (!stat.isFile() || stat.size > 64 * 1024 * 1024) throw new Error(tr('m178'));
   return source(await fs.readFile(absolute), path.basename(absolute), absolute);
 }
 async function pickImage() {
   const result = await dialog.showOpenDialog(win!, {
-    title: 'PINTO에서 이미지 열기',
+    title: tr('m179'),
     properties: ['openFile'],
-    filters: [{ name: '이미지', extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+    filters: [{ name: tr('m180'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
   });
   return result.canceled ? null : fileSource(result.filePaths[0]);
 }
@@ -124,26 +123,30 @@ async function clipboardImage() {
     for (const item of items) {
       const type = item.types.find((t) => ['image/png', 'image/jpeg', 'image/webp'].includes(t));
       if (type)
-        return source(
-          Buffer.from(await (await item.getType(type)).arrayBuffer()),
-          '붙여넣은 이미지.png',
-        );
+        return source(Buffer.from(await (await item.getType(type)).arrayBuffer()), tr('m181'));
     }
   } else if (api.readImage) {
     const image = api.readImage();
-    if (!image.isEmpty()) return source(image.toPNG(), '붙여넣은 이미지.png');
+    if (!image.isEmpty()) return source(image.toPNG(), tr('m181'));
   }
   return null;
 }
 function handle(name: string, fn: (...values: any[]) => unknown) {
   ipcMain.handle(`pinto:${name}`, (event, ...values) => {
     if (!win || event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame)
-      throw new Error('허용되지 않은 요청입니다.');
+      throw new Error(tr('m182'));
     return fn(...values);
   });
 }
 function setupIPC() {
   handle('info', info);
+  handle('set-language', async (locale: unknown) => {
+    if (!locales.includes(locale as any)) throw new Error('Unsupported language');
+    await atomicWrite(path.join(store.dataPath, 'language.json'), JSON.stringify({ locale }));
+    setLocale(locale);
+    buildMenu();
+    return info();
+  });
   handle('bootstrap', async (): Promise<Bootstrap> => {
     const result: Bootstrap = {
       info: info(),
@@ -162,7 +165,7 @@ function setupIPC() {
       try {
         result.opened = await store.load(store.lastId);
       } catch {
-        result.warning = '이전 작업을 열지 못했어요. 참고 이미지가 있는지 확인해 주세요.';
+        result.warning = tr('m183');
       }
     }
     return result;
@@ -170,7 +173,11 @@ function setupIPC() {
   handle('pick-image', pickImage);
   handle('import-file', fileSource);
   handle('clipboard-image', clipboardImage);
-  handle('example', () => fileSource(path.join(root, 'assets/example.png')));
+  handle('example', () =>
+    fileSource(
+      path.join(root, getLocale() === 'es' ? 'assets/example-es.png' : 'assets/example.png'),
+    ),
+  );
   handle('create-document', async (input: { token?: unknown; dataUrl?: unknown }) => {
     if (
       !input ||
@@ -179,17 +186,17 @@ function setupIPC() {
       !input.dataUrl.startsWith('data:image/png;base64,') ||
       input.dataUrl.length > 100_000_000
     )
-      throw new Error('이미지 정보를 확인해 주세요.');
+      throw new Error(tr('m184'));
     const meta = imports.get(input.token);
-    if (!meta) throw new Error('이미지를 다시 열어 주세요.');
+    if (!meta) throw new Error(tr('m185'));
     const png = Buffer.from(input.dataUrl.slice(22), 'base64');
-    if (mimeOf(png) !== 'image/png' || png.length < 24) throw new Error('이미지를 읽지 못했어요.');
+    if (mimeOf(png) !== 'image/png' || png.length < 24) throw new Error(tr('m186'));
     const width = png.readUInt32BE(16),
       height = png.readUInt32BE(20);
     if (!width || !height || width > 16000 || height > 16000 || width * height > 64_000_000)
-      throw new Error('이미지는 한 변 16,000px, 총 6,400만 픽셀 이하로 열어 주세요.');
+      throw new Error(tr('m001'));
     const image = nativeImage.createFromBuffer(png);
-    if (image.isEmpty()) throw new Error('이미지를 읽지 못했어요.');
+    if (image.isEmpty()) throw new Error(tr('m186'));
     const opened = await store.create(meta.name, png, width, height, meta.sourcePath);
     imports.delete(input.token);
     return opened;
@@ -201,17 +208,17 @@ function setupIPC() {
   handle('copy', async (value) => {
     const doc = await store.save(value),
       count = instructionCount(doc);
-    if (!count) throw new Error('지시를 하나 이상 적어 주세요.');
+    if (!count) throw new Error(tr('m187'));
     await clipboard.writeText(formatInstructions(doc));
     return count;
   });
   handle('export', async (value) => {
     const doc = await store.save(value);
-    if (!instructionCount(doc)) throw new Error('지시를 하나 이상 적어 주세요.');
+    if (!instructionCount(doc)) throw new Error(tr('m187'));
     const result = await dialog.showSaveDialog(win!, {
-      title: '지시문 저장',
-      defaultPath: `${path.parse(doc.name).name}-지시.txt`,
-      filters: [{ name: '텍스트', extensions: ['txt'] }],
+      title: tr('m188'),
+      defaultPath: tr('m189', { p0: path.parse(doc.name).name }),
+      filters: [{ name: tr('m190'), extensions: ['txt'] }],
     });
     if (result.canceled || !result.filePath) return false;
     await atomicWrite(result.filePath, formatInstructions(doc));
@@ -220,7 +227,7 @@ function setupIPC() {
   handle('copy-modification', () => clipboard.writeText(info().modificationGuide));
   handle('workspace', async (id?: string) => {
     const result = await dialog.showOpenDialog(win!, {
-      title: '이미지와 메모를 보관할 폴더',
+      title: tr('m191'),
       properties: ['openDirectory', 'createDirectory'],
       defaultPath: store.workspace,
     });
@@ -255,10 +262,57 @@ async function sendImage(file?: string) {
   } catch (error) {
     await dialog.showMessageBox(win!, {
       type: 'error',
-      title: '이미지를 열지 못했어요',
+      title: tr('m192'),
       message: (error as Error).message,
     });
   }
+}
+function buildMenu() {
+  Menu.setApplicationMenu(
+    Menu.buildFromTemplate([
+      ...(process.platform === 'darwin'
+        ? [
+            {
+              label: 'PINTO',
+              submenu: [
+                { label: tr('about'), role: 'about' as const },
+                { type: 'separator' as const },
+                { label: tr('hide'), role: 'hide' as const },
+                { label: tr('quit'), role: 'quit' as const },
+              ],
+            },
+          ]
+        : []),
+      {
+        label: tr('m193'),
+        submenu: [
+          { label: tr('m055'), accelerator: 'CmdOrCtrl+O', click: () => void sendImage() },
+          { label: tr('m077'), role: 'close' },
+        ],
+      },
+      {
+        label: tr('m194'),
+        submenu: [
+          {
+            label: tr('m024'),
+            accelerator: 'CmdOrCtrl+Z',
+            click: () => win?.webContents.send('pinto:edit', 'undo'),
+          },
+          {
+            label: tr('m025'),
+            accelerator: 'CmdOrCtrl+Shift+Z',
+            click: () => win?.webContents.send('pinto:edit', 'redo'),
+          },
+          { type: 'separator' },
+          { label: tr('cut'), role: 'cut' },
+          { label: tr('copy'), role: 'copy' },
+          { label: tr('m056'), role: 'paste' },
+          { label: tr('selectAll'), role: 'selectAll' },
+        ],
+      },
+      { label: tr('m195'), submenu: [{ label: tr('fullScreen'), role: 'togglefullscreen' }] },
+    ]),
+  );
 }
 function createWindow() {
   allowClose = false;
@@ -340,62 +394,27 @@ else {
   app
     .whenReady()
     .then(async () => {
+      let savedLocale: unknown;
+      try {
+        savedLocale = JSON.parse(
+          await fs.readFile(path.join(store.dataPath, 'language.json'), 'utf8'),
+        ).locale;
+      } catch {
+        /* Use system language if preferences are absent or damaged. */
+      }
+      setLocale(option('--language') || savedLocale || app.getLocale());
       await store.init(option('--workspace') ? path.resolve(option('--workspace')!) : undefined);
       if (process.platform === 'darwin') app.dock?.setIcon(path.join(root, 'assets/icon.png'));
       setupIPC();
       createWindow();
-      Menu.setApplicationMenu(
-        Menu.buildFromTemplate([
-          ...(process.platform === 'darwin'
-            ? [
-                {
-                  label: 'PINTO',
-                  submenu: [
-                    { role: 'about' as const },
-                    { type: 'separator' as const },
-                    { role: 'hide' as const },
-                    { role: 'quit' as const },
-                  ],
-                },
-              ]
-            : []),
-          {
-            label: '파일',
-            submenu: [
-              { label: '이미지 열기', accelerator: 'CmdOrCtrl+O', click: () => void sendImage() },
-              { role: 'close' },
-            ],
-          },
-          {
-            label: '편집',
-            submenu: [
-              {
-                label: '실행 취소',
-                accelerator: 'CmdOrCtrl+Z',
-                click: () => win?.webContents.send('pinto:edit', 'undo'),
-              },
-              {
-                label: '다시 실행',
-                accelerator: 'CmdOrCtrl+Shift+Z',
-                click: () => win?.webContents.send('pinto:edit', 'redo'),
-              },
-              { type: 'separator' },
-              { role: 'cut' },
-              { role: 'copy' },
-              { role: 'paste' },
-              { role: 'selectAll' },
-            ],
-          },
-          { label: '보기', submenu: [{ role: 'togglefullscreen' }] },
-        ]),
-      );
+      buildMenu();
       app.on('activate', () => {
         if (!win) createWindow();
       });
     })
     .catch((error) => {
       console.error(error);
-      dialog.showErrorBox('PINTO 실행 오류', String(error));
+      dialog.showErrorBox(tr('m196'), String(error));
       app.quit();
     });
   app.on('before-quit', () => {

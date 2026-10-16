@@ -1,4 +1,4 @@
-param([string]$Workspace, [switch]$NoShortcut, [switch]$NoLaunch)
+param([string]$Workspace, [ValidateSet('ko','en','es')][string]$Language, [switch]$NoShortcut, [switch]$NoLaunch)
 $ErrorActionPreference = 'Stop'
 $pintoRoot = $PSScriptRoot
 Set-Location -LiteralPath $pintoRoot
@@ -43,5 +43,6 @@ $pintoArgs = @((Join-Path $pintoRoot 'scripts\setup.mjs'))
 if ($Workspace) { $pintoArgs += @('--workspace', (Resolve-Path -LiteralPath $Workspace).Path) }
 if ($NoShortcut) { $pintoArgs += '--no-shortcut' }
 if ($NoLaunch) { $pintoArgs += '--no-launch' }
+if ($Language) { $pintoArgs += @('--language', $Language) }
 & $pintoNode @pintoArgs
 if ($LASTEXITCODE -ne 0) { throw 'PINTO setup did not complete.' }

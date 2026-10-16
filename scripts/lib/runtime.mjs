@@ -1,3 +1,9 @@
+import { tr, setLocale } from '../../src/core/i18n.mjs';
+setLocale(
+  process.argv[process.argv.indexOf('--language') + 1] && process.argv.includes('--language')
+    ? process.argv[process.argv.indexOf('--language') + 1]
+    : Intl.DateTimeFormat().resolvedOptions().locale,
+);
 import { promises as fs, constants } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -55,9 +61,7 @@ export async function npmCLI() {
       if (resolved.endsWith('npm-cli.js')) return resolved;
     } catch {}
   }
-  throw new Error(
-    'npm 실행 파일을 찾지 못했습니다. install.ps1 또는 install.sh로 실행 환경을 준비하세요.',
-  );
+  throw new Error(tr('m216'));
 }
 export async function runNpm(args, options = {}) {
   return run(process.execPath, [await npmCLI(), ...args], options);

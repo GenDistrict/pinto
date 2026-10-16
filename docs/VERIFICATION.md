@@ -1,5 +1,15 @@
 # PINTO 검증 기록
 
+## 0.2.0 — 2026-10-16
+
+Windows x64: type check, production build, 13 core/catalog tests, and all 8 Electron scenarios passed. The multilingual scenario exercised English, Spanish, and Korean UI switching; translated clipboard output, native menus, export dialog titles, and native errors; an 860 px window; restarting with a saved Spanish preference; and reopening user notes without translation or data loss.
+
+A separate source installation with Node.js absent from PATH passed using `install.ps1 -Language es`: the private runtime was downloaded and verified, dependencies installed, the app built and launched, and both the ready report and customization message used Spanish. The installed local app was normally closed with its save handshake and reopened as 0.2.0; `windowReady` and `windowVisible` were true.
+
+English and Spanish demo videos were recorded from the actual localized UI, with localized sample images and notes. Both 20-second MP4s have narration in their respective languages and passed full decoding. Documentation links were checked locally. macOS was not run on a physical device in this session; CI/device verification remains separate.
+
+**Español:** En Windows x64 pasaron la comprobación de tipos, la compilación, 13 pruebas principales y las 8 pruebas de Electron. Se verificaron el cambio y la persistencia del idioma, los textos copiados, los diálogos y errores, y la conservación de las notas. También pasó una instalación limpia en español sin Node.js previo. Los ejemplos muestran la interfaz real en ambos idiomas. macOS no se verificó en un dispositivo físico en esta sesión.
+
 ## 0.1.3
 
 - Windows: 타입 검사, 코어 테스트 11개, 프로덕션 빌드 통과.

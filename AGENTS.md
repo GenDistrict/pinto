@@ -1,5 +1,13 @@
 # PINTO 작업 안내
 
+## Language / Idioma
+
+PINTO supports English, Spanish, and Korean. Read `INSTALL.md` for English installation, `INSTALL.es.md` for Spanish, or `INSTALL.ko.md` for Korean. Match the user's response language. UI text, native dialogs, errors, and copy/export formatting must use `src/core/i18n.mjs` and the three catalogs under `src/core/locales/`. Preserve user notes, paths, and coordinates when switching languages. Update all catalogs and test the behavior. See `docs/I18N.md`. After installation, report the actual source location, launch method, verified window result, and that the agent can modify this app's local source on request. Never claim a launch you did not verify.
+
+PINTO admite español, inglés y coreano. Para instalar en español, sigue `INSTALL.es.md`. Conserva las notas, rutas y coordenadas del usuario al cambiar de idioma. Todo texto de la aplicación debe usar los tres catálogos de traducción. Verifica los cambios y comunica la ubicación real del código, cómo abrir la aplicación y que el agente puede personalizarla. No afirmes que se abrió si no lo verificaste.
+
+Developer commands: `npm run check`, `npm test`, `npm run build`, `npm run test:e2e`. Source map: `src/renderer/App.tsx` (UI), `Canvas.tsx` (geometry interactions), `src/core/model.ts` (coordinates, validation, instructions), `src/main/storage.ts` (atomic persistence), `src/main/index.ts`/`src/preload/index.ts` (restricted desktop API). Never expose Node.js or unrestricted IPC in the renderer. Preserve source edits and data; use the documented maintenance workflow instead of overwriting installations. Keep image coordinates independent of display zoom/DPI and preserve document versions 1/2/3 and IME input behavior.
+
 PINTO는 Windows·macOS용 로컬 이미지 지시 편집기입니다. 사용자가 소스를 내려받아 AI와 함께 수정하는 제품입니다. 확정된 브랜드는 PINTO이며 `src/renderer/theme.css`와 `assets/brand/`를 기준으로 합니다.
 
 설치 요청은 `INSTALL.md`를 따릅니다. 설치 완료 후 현재 AI 대화에 소스 위치와 실행 방법, 그리고 사용자 요청에 따라 이 앱의 소스를 수정할 수 있다는 사실을 반드시 알려 주세요. 실행 확인에 실패했거나 생략한 경우에는 창을 열었다고 보고하지 않습니다.

@@ -20,3 +20,4 @@ PINTO.lnk
 .DS_Store
 Thumbs.db
 /--allow-file-access-from-files
+/media/

@@ -1,3 +1,4 @@
+import { tr } from '../core/i18n.mjs';
 import {
   useCallback,
   useEffect,
@@ -394,7 +395,7 @@ export function Canvas({
         <g
           role="button"
           tabIndex={0}
-          aria-label={`지시 ${index + 1} 선택`}
+          aria-label={tr('m097', { p0: index + 1 })}
           className="target-badge"
           onKeyDown={(e) => {
             if (e.key === 'Enter') onSelect(noteId);
@@ -425,7 +426,7 @@ export function Canvas({
         </g>
         {selected && (t.kind === 'rect' || t.kind === 'ellipse') && (
           <rect
-            aria-label="영역 크기 조절"
+            aria-label={tr('m098')}
             x={t.x + t.width - 5 / s}
             y={t.y + t.height - 5 / s}
             width={10 / s}
@@ -445,7 +446,7 @@ export function Canvas({
             <circle
               key={endpoint}
               data-endpoint={endpoint}
-              aria-label={endpoint === 'start' ? '선 시작점 조절' : '선 끝점 조절'}
+              aria-label={endpoint === 'start' ? tr('m099') : tr('m100')}
               cx={t[endpoint].x}
               cy={t[endpoint].y}
               r={5 / s}
@@ -492,7 +493,7 @@ export function Canvas({
       <svg
         ref={svg}
         className="image-canvas"
-        aria-label="이미지 작업 영역"
+        aria-label={tr('m101')}
         onPointerDown={(e) => begin(e, 'create')}
         onPointerMove={move}
         onPointerUp={end}
@@ -570,20 +571,20 @@ export function Canvas({
           )}
         </g>
       </svg>
-      <div className="view-controls" aria-label="화면 도구">
+      <div className="view-controls" aria-label={tr('m102')}>
         {(
           [
-            ['rect', '네모', Square, '드래그해서 네모로 표시'],
-            ['ellipse', '동그라미', Circle, '드래그해서 원·타원으로 표시'],
-            ['point', '점', CircleDot, '클릭해서 점 찍기 · 기존 표시 이동'],
-            ['line', '선', Slash, '드래그해서 직선으로 표시'],
-            ['stroke', '자유도형', Pencil, '손으로 자유롭게 그려서 표시'],
+            ['rect', tr('m103'), Square, tr('m104')],
+            ['ellipse', tr('m105'), Circle, tr('m106')],
+            ['point', tr('m107'), CircleDot, tr('m108')],
+            ['line', tr('m109'), Slash, tr('m110')],
+            ['stroke', tr('m111'), Pencil, tr('m112')],
           ] as const
         ).map(([kind, label, Icon, title]) => (
           <button
             key={kind}
             className={`shape-tool ${!hand && tool === kind ? 'selected' : ''}`}
-            aria-label={`${label} 도구`}
+            aria-label={tr('m113', { p0: label })}
             aria-pressed={!hand && tool === kind}
             title={title}
             onClick={() => {
@@ -598,8 +599,8 @@ export function Canvas({
         <span className="tool-divider" />
         <button
           className={hand ? 'selected' : ''}
-          aria-label="화면 이동 도구"
-          title="화면 이동 (Space)"
+          aria-label={tr('m114')}
+          title={tr('m115')}
           onClick={() => {
             setHand(true);
           }}
@@ -608,7 +609,7 @@ export function Canvas({
         </button>
         <span className="tool-divider" />
         <button
-          aria-label="축소"
+          aria-label={tr('m116')}
           onClick={() => {
             fitted.current = false;
             changeView(
@@ -624,7 +625,7 @@ export function Canvas({
         </button>
         <span className="zoom-value">{Math.round(view.scale * 100)}%</span>
         <button
-          aria-label="확대"
+          aria-label={tr('m117')}
           onClick={() => {
             fitted.current = false;
             changeView(
@@ -640,8 +641,8 @@ export function Canvas({
         </button>
         <span className="tool-divider" />
         <button
-          aria-label="화면에 맞춤"
-          title="화면에 맞춤"
+          aria-label={tr('m118')}
+          title={tr('m118')}
           onClick={() => {
             fitted.current = true;
             changeView(fitView(doc.width, doc.height, size.width, size.height));
@@ -654,21 +655,21 @@ export function Canvas({
         <div className="canvas-hint">
           <span className="tiny-dot" />
           {hand || space
-            ? '드래그해서 화면을 이동하세요'
+            ? tr('m119')
             : {
-                point: '클릭해서 점을 찍고 지시를 남기세요',
-                rect: '드래그해서 네모로 표시하세요',
-                ellipse: '드래그해서 동그라미로 표시하세요',
-                line: '드래그해서 선을 그으세요',
-                stroke: '자유롭게 그리고 지시를 남기세요',
+                point: tr('m120'),
+                rect: tr('m121'),
+                ellipse: tr('m122'),
+                line: tr('m123'),
+                stroke: tr('m124'),
               }[tool]}
         </div>
       )}
       {adding && (
         <div className="adding-hint">
           <Crosshair size={15} />
-          같은 지시를 적용할 곳을 더 찍어주세요
-          <button onClick={onAdding} aria-label="대상 추가 끝내기">
+          {tr('m125')}
+          <button onClick={onAdding} aria-label={tr('m126')}>
             <X size={14} />
           </button>
         </div>
@@ -683,16 +684,16 @@ export function Canvas({
             <span className="number-badge">
               {doc.notes.findIndex((n) => n.id === activeId) + 1}
             </span>
-            <strong>여기는 이렇게</strong>
-            <span className="target-count">대상 {active.targets.length}개</span>
-            <button className="icon-button small" aria-label="지시 입력 닫기" onClick={onDismiss}>
+            <strong>{tr('m127')}</strong>
+            <span className="target-count">{tr('m040', { p0: active.targets.length })}</span>
+            <button className="icon-button small" aria-label={tr('m130')} onClick={onDismiss}>
               <X size={15} />
             </button>
           </div>
           <textarea
             ref={editor}
-            aria-label="수정 지시"
-            placeholder="어떻게 바꿀까요?"
+            aria-label={tr('m131')}
+            placeholder={tr('m132')}
             value={active.text}
             maxLength={20000}
             onChange={(e) => onText(active.id, e.target.value)}
@@ -707,18 +708,19 @@ export function Canvas({
           <div className="note-actions">
             <button className={`text-button ${adding ? 'active' : ''}`} onClick={onAdding}>
               <Plus size={14} />
-              대상 추가
+              {tr('m133')}
             </button>
             <button
               className="icon-button small delete"
-              aria-label="현재 지시 삭제"
+              aria-label={tr('m134')}
               onClick={() => onDelete(active.id)}
             >
               <Trash2 size={14} />
             </button>
             <button className="done-button" onClick={onDismiss}>
               <Check size={14} />
-              완료 <kbd>↵</kbd>
+              {tr('m135')}
+              <kbd>↵</kbd>
             </button>
           </div>
         </div>

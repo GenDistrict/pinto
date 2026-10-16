@@ -1,3 +1,4 @@
+import { tr } from './i18n.mjs';
 export type Point = { x: number; y: number };
 export type PointTarget = Point & { id: string; kind: 'point' };
 export type RectTarget = Point & { id: string; kind: 'rect'; width: number; height: number };
@@ -30,6 +31,7 @@ export type Recent = {
   noteCount: number;
 };
 export type AppInfo = {
+  locale: import('./i18n.mjs').Locale;
   version: string;
   platform: string;
   sourceRoot: string;
@@ -184,35 +186,46 @@ export function zoomAt(view: View, anchor: Point, scale: number): View {
 }
 export function targetDescription(target: Target): string {
   if (target.kind === 'line')
-    return `선 (${target.start.x}, ${target.start.y}) → (${target.end.x}, ${target.end.y})`;
+    return tr('m136', {
+      p0: target.start.x,
+      p1: target.start.y,
+      p2: target.end.x,
+      p3: target.end.y,
+    });
   if (target.kind === 'ellipse')
-    return `타원 영역 (${target.x}, ${target.y}, ${target.width}, ${target.height})`;
+    return tr('m137', { p0: target.x, p1: target.y, p2: target.width, p3: target.height });
   if (target.kind === 'stroke') {
     const width = Math.max(1, Math.max(...target.points.map((p) => p.x)) - target.x);
     const height = Math.max(1, Math.max(...target.points.map((p) => p.y)) - target.y);
-    return `자유도형 범위 (${target.x}, ${target.y}, ${width}, ${height}), 경로: ${strokePath(target.points)}`;
+    return tr('m138', {
+      p0: target.x,
+      p1: target.y,
+      p2: width,
+      p3: height,
+      p4: strokePath(target.points),
+    });
   }
   return target.kind === 'point'
-    ? `지점 (${target.x}, ${target.y})`
-    : `영역 (${target.x}, ${target.y}, ${target.width}, ${target.height})`;
+    ? tr('m139', { p0: target.x, p1: target.y })
+    : tr('m140', { p0: target.x, p1: target.y, p2: target.width, p3: target.height });
 }
 export function instructionCount(doc: Document): number {
   return doc.notes.filter((n) => n.text.trim()).length + (doc.globalInstruction.trim() ? 1 : 0);
 }
 export function formatInstructions(doc: Document): string {
   const lines = [
-    '이 대화의 원본 또는 함께 첨부한 이미지를 참고해 아래 지시를 반영해 주세요.',
-    '로컬 파일에 접근할 수 있으면 다음 참고 이미지를 열어 확인해 주세요.',
+    tr('m141'),
+    tr('m142'),
     '',
-    `이미지 이름: ${doc.name}`,
-    `이미지: ${doc.referencePath}`,
-    `크기: ${doc.width}×${doc.height} px`,
-    '좌표: 좌상단 원점 (0, 0), x는 오른쪽, y는 아래쪽',
-    '영역: (x, y, 너비, 높이)',
+    tr('m143', { p0: doc.name }),
+    tr('m144', { p0: doc.referencePath }),
+    tr('m145', { p0: doc.width, p1: doc.height }),
+    tr('m146'),
+    tr('m147'),
     '',
   ];
   if (doc.notes.some((n) => n.targets.some((t) => t.kind === 'stroke'))) {
-    lines.push('자유도형은 위치를 가리키는 표시이며 정밀 선택 마스크가 아닙니다.', '');
+    lines.push(tr('m148'), '');
   }
   doc.notes
     .filter((n) => n.text.trim())
@@ -226,7 +239,8 @@ export function formatInstructions(doc: Document): string {
         '',
       );
     });
-  if (doc.globalInstruction.trim()) lines.push(`전체 지시: ${doc.globalInstruction.trim()}`, '');
+  if (doc.globalInstruction.trim())
+    lines.push(tr('m149', { p0: doc.globalInstruction.trim() }), '');
   return lines.join('\n').trimEnd();
 }
 function record(value: unknown): value is Record<string, unknown> {
@@ -243,7 +257,7 @@ export function validateDocument(value: unknown): asserts value is Document {
     !record(value) ||
     (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3)
   )
-    throw new Error('지원하지 않는 문서 형식입니다. 원본 데이터는 보존됩니다.');
+    throw new Error(tr('m150'));
   if (
     !text(value.id, 100) ||
     !value.id ||
@@ -253,7 +267,7 @@ export function validateDocument(value: unknown): asserts value is Document {
     !text(value.updatedAt, 100) ||
     !text(value.globalInstruction, 20000)
   )
-    throw new Error('문서 정보가 올바르지 않습니다.');
+    throw new Error(tr('m151'));
   if (
     !integer(value.width) ||
     !integer(value.height) ||
@@ -263,11 +277,9 @@ export function validateDocument(value: unknown): asserts value is Document {
     value.width > 16000 ||
     value.height > 16000
   )
-    throw new Error('지원할 수 없는 이미지 크기입니다.');
-  if (value.sourcePath !== undefined && !text(value.sourcePath, 32768))
-    throw new Error('원본 경로가 올바르지 않습니다.');
-  if (!Array.isArray(value.notes) || value.notes.length > 1000)
-    throw new Error('지시 개수를 확인해 주세요.');
+    throw new Error(tr('m152'));
+  if (value.sourcePath !== undefined && !text(value.sourcePath, 32768)) throw new Error(tr('m153'));
+  if (!Array.isArray(value.notes) || value.notes.length > 1000) throw new Error(tr('m154'));
   const ids = new Set<string>();
   for (const n of value.notes) {
     if (
@@ -280,7 +292,7 @@ export function validateDocument(value: unknown): asserts value is Document {
       n.targets.length < 1 ||
       n.targets.length > 100
     )
-      throw new Error('지시 형식이 올바르지 않습니다.');
+      throw new Error(tr('m155'));
     ids.add(n.id);
     for (const t of n.targets) {
       if (
@@ -296,10 +308,10 @@ export function validateDocument(value: unknown): asserts value is Document {
         t.x >= value.width ||
         t.y >= value.height
       )
-        throw new Error('대상 좌표가 이미지 범위를 벗어났습니다.');
+        throw new Error(tr('m156'));
       ids.add(t.id);
       if ((t.kind === 'ellipse' || t.kind === 'line') && value.schemaVersion !== 3)
-        throw new Error('이 도형은 문서 형식 버전 3이 필요합니다.');
+        throw new Error(tr('m157'));
       if (t.kind === 'line') {
         const a = t.start,
           b = t.end;
@@ -316,13 +328,13 @@ export function validateDocument(value: unknown): asserts value is Document {
               p.y >= (value.height as number),
           )
         )
-          throw new Error('선의 좌표가 올바르지 않습니다.');
+          throw new Error(tr('m158'));
         if (
           t.x !== Math.min(a.x as number, b.x as number) ||
           t.y !== Math.min(a.y as number, b.y as number) ||
           (a.x === b.x && a.y === b.y)
         )
-          throw new Error('선의 시작점과 끝점을 확인해 주세요.');
+          throw new Error(tr('m159'));
       }
       if (t.kind === 'stroke') {
         if (
@@ -341,14 +353,14 @@ export function validateDocument(value: unknown): asserts value is Document {
               p.y >= (value.height as number),
           )
         ) {
-          throw new Error('자유도형 좌표가 올바르지 않습니다.');
+          throw new Error(tr('m160'));
         }
         const points = t.points as Point[];
         if (
           t.x !== Math.min(...points.map((p) => p.x)) ||
           t.y !== Math.min(...points.map((p) => p.y))
         )
-          throw new Error('자유도형 범위가 일치하지 않습니다.');
+          throw new Error(tr('m161'));
       }
       if (
         (t.kind === 'rect' || t.kind === 'ellipse') &&
@@ -359,7 +371,7 @@ export function validateDocument(value: unknown): asserts value is Document {
           t.x + t.width > value.width ||
           t.y + t.height > value.height)
       )
-        throw new Error('영역 크기가 이미지 범위를 벗어났습니다.');
+        throw new Error(tr('m162'));
     }
   }
 }

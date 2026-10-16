@@ -1,67 +1,75 @@
 # PINTO
 
+[English](README.md) · [Español](README.es.md) · [한국어](README.ko.md)
+
 ![PINTO](assets/brand/logo.svg)
 
-**이미지 위에 콕. AI에게 바로 전달.**
+**Point at what you mean. Let your AI do the editing.**
 
-이미지에서 위치를 찍거나 영역을 드래그하고 지시를 적으세요. PINTO가 참고 이미지 경로와 픽셀 좌표를 함께 복사합니다. Windows와 macOS에서 독립된 창으로 실행하며, 로컬 AI가 읽을 수 있는 작업 폴더에 이미지를 보관합니다.
+PINTO is a small, source-editable desktop app for Windows and macOS. Open an image, mark what should change, write instructions, and copy them into your coding agent. The copied text includes the reference image path and original-pixel coordinates.
 
-## thread0에서 설치하기
+PINTO prepares instructions. Your agent performs the edit using image generation or suitable tools it has available. If it can read the referenced local file, you do not need to attach it again. In a new conversation without local file access, attach the original too.
 
-아래 문장을 thread0의 Claude Code 또는 Codex에 붙여넣으세요.
+## Install with your AI
+
+Paste this into thread0, Claude Code, or Codex:
 
 ```text
 https://github.com/GenDistrict/pinto
-이 앱 깔아줘. INSTALL.md를 읽고 설치한 다음 실행까지 해줘.
+Install this app. Read INSTALL.md, use English, and launch it when ready.
 ```
 
-Git이나 Node.js를 미리 설치할 필요가 없습니다. AI가 Git clone 또는 [소스 ZIP](https://github.com/GenDistrict/pinto/archive/refs/heads/main.zip)으로 내려받고, 설치 스크립트가 필요한 실행 환경을 준비합니다. 최초 설치에는 인터넷 연결과 AI의 로컬 명령 실행 권한이 필요합니다.
+The agent follows [INSTALL.md](INSTALL.md), downloads the source, prepares the runtime, builds, and opens the app. Git and Node.js do not need to be preinstalled: a [source ZIP](https://github.com/GenDistrict/pinto/archive/refs/heads/main.zip) and a private Node.js runtime are supported. Initial installation requires internet and permission to run local commands. No personal developer certificate is required.
 
-thread0의 Claude Code 또는 Codex에 **이 저장소 URL과 “PINTO 깔아줘”**를 전달하세요. AI는 [INSTALL.md](INSTALL.md)를 읽고 소스를 내려받아 실행 환경을 준비한 뒤 앱을 엽니다. 사용자용 개발자 인증서나 공증 설정은 필요하지 않습니다.
-
-설치하는 AI는 앱 화면이 준비된 것을 확인한 뒤 **이 앱의 로컬 소스를 직접 수정해서 쓸 수 있다는 사실**과 소스 위치·실행 방법을 같은 대화에 안내해야 합니다. 완료 정보는 `.pinto/install-result.json`에도 저장됩니다.
-
-다운로드한 소스 폴더에서 직접 설치할 수도 있습니다.
+Manual installation from the downloaded source:
 
 ```powershell
-# Windows PowerShell
-./install.ps1
+# Windows
+./install.ps1 -Language en
 ```
 
 ```sh
 # macOS
-sh ./install.sh
+sh ./install.sh --language en
 ```
 
-작업 폴더 옵션은 선택 사항입니다. AI가 이미 읽을 수 있는 현재 프로젝트 폴더를 지정하는 것을 권장합니다. 일반적인 설치는 사용자 영역에서 수행하며, 운영체제나 thread0의 실행 권한은 해당 환경의 정책을 따릅니다.
+## English, Spanish, and Korean
 
-Windows 10 이상(x64·ARM64), macOS 13.5 이상(Intel·Apple Silicon)을 대상으로 합니다. 실제 검증 현황은 [검증 기록](docs/VERIFICATION.md)에 따로 기록합니다. Linux는 이번 버전의 지원 대상에 포함하지 않습니다.
+The app uses your system language, with English as the fallback. Change it using the selector at the bottom of the window; your choice persists across restarts. Tools, help, dialogs, app errors, and copied/exported instructions follow that language. Your own notes are never translated or overwritten.
 
-## 사용하기
+| English | Español |
+| --- | --- |
+| [Actual app demo](docs/examples/pinto-en.mp4) | [Demostración real](docs/examples/pinto-es.mp4) |
+| [Screenshot](docs/examples/pinto-en.png) | [Captura](docs/examples/pinto-es.png) |
 
-![PINTO의 네모·동그라미·점·선·자유도형과 지시 입력 화면](docs/screenshots/shapes.png)
+![PINTO in English](docs/examples/pinto-en.png)
 
-1. 이미지를 드롭하거나 붙여넣습니다. PNG·JPEG·WebP를 지원합니다.
-2. **네모·동그라미·점·선·자유도형** 중 원하는 도구를 고릅니다. 점은 클릭하고, 나머지는 드래그해서 표시한 뒤 바로 지시를 입력합니다. 동그라미는 원·타원을 그릴 수 있으며, 자유도형은 손으로 그리는 방식입니다.
-3. 다른 곳에 표시하면 다음 지시를 작성할 수 있습니다. 같은 지시에 대상을 더하려면 **대상 추가** 또는 Shift+클릭·드래그를 사용합니다. 도형 종류가 달라도 한 지시에 묶을 수 있습니다.
-4. **지시 복사** 또는 Ctrl+Enter / ⌘Enter를 누릅니다.
-5. **원본을 만든 AI 대화의 다음 메시지에 붙여넣습니다. 새 대화라면 원본 이미지도 함께 전달합니다.** 로컬 파일을 읽는 AI는 복사된 참고 경로를 사용할 수 있습니다. 이미지가 자동으로 첨부되지는 않습니다.
+Examples use the actual localized UI, sample image, and notes. See [internationalization](docs/I18N.md) for implementation and verification.
 
-실행 취소·다시 실행, 지시 목록, 확대·이동, TXT 저장, 자동 저장과 최근 작업 복원을 제공합니다. 공통 조건은 AI 대화에서 지시와 함께 적으면 됩니다. 화면 아래 **이미지 파일 보기**로 표시가 없는 참고 파일을 찾아 첨부할 수 있습니다. 이미지 회전 정보는 저장된 참고 이미지와 화면에 동일하게 반영합니다. 이미지 한 변은 16,000px, 총 6,400만 픽셀, 입력 파일은 64MB까지 지원합니다.
+## Use it
 
-이미지와 메모는 자동 보관합니다. 저장 위치를 바꿀 때만 **더 보기 → 이미지 보관 폴더 변경**을 사용하세요. 이 설정은 파일 보관 위치를 정하는 기능입니다.
+1. Open, drop, or paste a PNG, JPEG, or WebP image.
+2. Choose **Rectangle, Ellipse, Point, Line, or Freehand**. Click for points; drag for other shapes. Type the change you want.
+3. Use **Add target** or Shift+click/drag for several targets in one instruction.
+4. Click **Copy instructions**, or press Ctrl+Enter / ⌘Enter.
+5. Paste into the AI conversation that created the original. In a new conversation, include the original too if needed.
 
-이미지를 화면에서 비우려면 상단 **이미지 닫기**를 누르세요. 작성한 지시는 자동 저장되며 시작 화면의 최근 작업에서 다시 열 수 있습니다.
+**Close image** saves and returns to the start screen. Reopen it from Recent work. Undo/redo, zoom/pan, TXT export, and automatic saving are included.
 
-## 원하는 대로 고쳐 쓰기
+Images are stored automatically. **More options → Change image storage folder** changes that location; it does not connect an AI account. Limits: 64 MB per image, 16,000 px per side, 64 million pixels total.
 
-AI에게 “코멘트 글자를 크게 해줘”, “단축키를 바꿔줘”, “복사되는 지시문 형식을 바꿔줘”라고 요청할 수 있습니다. 새 AI 세션에는 앱의 **더 보기 → 앱 수정 안내 복사**로 소스 위치와 실행 방법을 전달하세요.
+## Make it yours
 
-코드는 [AGENTS.md](AGENTS.md)의 구조 안내에 따라 수정합니다. 이미지와 코멘트는 소스와 별도로 저장합니다. 개인 수정은 자동 업데이트로 덮어쓰지 않습니다. [업데이트·복구 안내](docs/MAINTENANCE.md)를 참고하세요.
+Ask your agent to change font sizes, shortcuts, or instruction formatting. In a new session, use **More options → Copy customization guide** to share source location and commands. Personal modifications are not automatically overwritten.
 
-## 개발 명령
+- [Installation and diagnostics](INSTALL.md)
+- [Maintenance and recovery](docs/MAINTENANCE.md)
+- [Agent instructions](AGENTS.md)
+- [Original planning archive (Korean)](docs/PRODUCT_PLAN.md)
 
-Node.js 22.12 이상이 필요합니다. 버전과 패키지는 잠금 파일을 기준으로 설치합니다.
+Target platforms: Windows 10+ (x64/ARM64) and macOS 13.5+ (Intel/Apple Silicon). Windows is tested locally; macOS CI/device results are tracked separately. Linux is not a supported target in this version.
+
+## Development
 
 ```sh
 npm ci
@@ -69,23 +77,12 @@ node node_modules/electron/install.js
 npm run check
 npm test
 npm run build
-npm start
-```
-
-```sh
-# AI가 특정 이미지와 작업 폴더를 지정해 열기
-npm start -- --image '/path/to/image.png' --workspace '/path/to/project'
-
-# 터미널 프로세스와 분리해서 실행하고 준비 결과 받기
-node scripts/launch.mjs --image '/path/to/image.png' --workspace '/path/to/project'
-
-# 환경 확인 / 실제 Electron UI 테스트
-npm run doctor -- --json
+npm start -- --language en
 npm run test:e2e
 ```
 
-브랜드는 [PINTO 가이드](brand-concepts/index.html), 제품 범위는 [최종 기획안](docs/PRODUCT_PLAN.md)에 정리되어 있습니다.
+Node.js 22.12+ is needed for these commands. The installers prepare it if necessary.
 
-## 라이선스
+## License
 
-[MIT](LICENSE). 소스를 내려받아 사용·수정·재배포할 수 있습니다. 외부 의존성은 각 패키지의 라이선스를 따릅니다.
+[MIT](LICENSE). Use, modify, and redistribute the source. Dependencies retain their own licenses.

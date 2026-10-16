@@ -1,3 +1,4 @@
+import { tr } from '../core/i18n.mjs';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -54,7 +55,7 @@ export class DocumentStore {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         const file = path.join(this.dataPath, 'index.json');
         await fs.copyFile(file, `${file}.recovery-${Date.now()}`).catch(() => {});
-        this.warning = '최근 작업 목록을 읽지 못했어요. 원래 목록은 복구용 사본으로 보관했습니다.';
+        this.warning = tr('m197');
       }
     }
     if (workspace) {
@@ -64,7 +65,7 @@ export class DocumentStore {
   }
   private directory(id: string) {
     const entry = this.index.documents.find((d) => d.id === id);
-    if (!entry) throw new Error('이 작업을 찾을 수 없어요. 최근 작업 목록을 확인해 주세요.');
+    if (!entry) throw new Error(tr('m198'));
     return entry.directory;
   }
   private serial<T>(fn: () => Promise<T>): Promise<T> {
@@ -128,8 +129,7 @@ export class DocumentStore {
         await fs.readFile(path.join(directory, 'annotations.json'), 'utf8'),
       );
       validateDocument(doc);
-      if (doc.id !== id)
-        throw new Error('작업 식별 정보가 일치하지 않아요. 원본 데이터는 보존됩니다.');
+      if (doc.id !== id) throw new Error(tr('m199'));
       doc.referencePath = path.join(directory, 'reference.png');
       const png = await fs.readFile(doc.referencePath);
       this.docs.set(id, doc);
@@ -143,7 +143,7 @@ export class DocumentStore {
     const input = structuredClone(value);
     return this.serial(async () => {
       const original = this.docs.get(input.id);
-      if (!original) throw new Error('먼저 작업을 열어 주세요.');
+      if (!original) throw new Error(tr('m200'));
       const doc: Document = {
         ...original,
         schemaVersion: Math.max(
@@ -217,7 +217,7 @@ export class DocumentStore {
   }
   get(id: string) {
     const doc = this.docs.get(id);
-    if (!doc) throw new Error('먼저 작업을 열어 주세요.');
+    if (!doc) throw new Error(tr('m200'));
     return doc;
   }
 }

@@ -20,6 +20,8 @@ async function launch(restore = false) {
       root,
       '--isolated',
       '--background',
+      '--language',
+      'ko',
       '--data-dir',
       path.join(run, 'data'),
       '--workspace',

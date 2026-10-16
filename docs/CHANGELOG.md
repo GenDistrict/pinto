@@ -1,5 +1,17 @@
 # PINTO 변경 기록
 
+## 0.2.0 — English / Español / 한국어
+
+- Added English and Spanish UI, native menu/dialog labels, app errors, help, clipboard/TXT instructions, and installation/customization messages.
+- Added system-language detection, a visible language selector, saved preferences, and `--language` / `-Language` options. Existing notes and coordinates remain unchanged.
+- Added English and Spanish README, installation and maintenance guides, localized sample images, and real UI recordings with localized notes and narration.
+- Added catalog/placeholder checks and real Electron tests for switching, persistence, dialogs, errors, clipboard output, narrow windows, and preserving existing work.
+
+### Español
+
+- Interfaz, ayuda, menús, diálogos, errores, instrucciones copiadas y mensajes de instalación en español e inglés.
+- Selector de idioma persistente, detección del idioma del sistema y ejemplos reales en ambos idiomas. Las notas del usuario se conservan sin traducir.
+
 ## 0.1.3
 
 - 상단에 **이미지 닫기**를 추가했습니다. 마지막 입력을 저장한 뒤 시작 화면으로 돌아갑니다.
