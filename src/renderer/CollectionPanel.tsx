@@ -11,6 +11,7 @@ export function CollectionPanel({
   onRemove,
   onAdd,
   onRules,
+  readOnly = false,
 }: {
   view: CollectionView;
   active: string;
@@ -19,6 +20,7 @@ export function CollectionPanel({
   onRemove: (id: string) => void;
   onAdd: () => void;
   onRules: (rules: SharedInstruction[]) => void;
+  readOnly?: boolean;
 }) {
   const [selected, setSelected] = useState<string[]>(view.images.map((i) => i.id));
   const [expanded, setExpanded] = useState(false);
@@ -26,11 +28,16 @@ export function CollectionPanel({
     setSelected((s) => s.filter((id) => view.images.some((i) => i.id === id)));
   }, [view.images]);
   const label = (id: string) =>
-    tr('batchImage', { number: view.images.find((i) => i.id === id)?.number });
+    tr(view.images.find((i) => i.id === id)?.kind ? 'docItem' : 'batchImage', {
+      number: view.images.find((i) => i.id === id)?.number,
+    });
   const update = (id: string, patch: Partial<SharedInstruction>) =>
     onRules(view.collection.instructions.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   return (
-    <section className="collection-panel" aria-label={tr('batchShared')}>
+    <section
+      className={`collection-panel${readOnly ? ' is-readonly' : ''}`}
+      aria-label={tr('batchShared')}
+    >
       <div className="image-strip">
         {view.images.map((image) => (
           <div key={image.id} className={`image-tile ${image.id === active ? 'active' : ''}`}>

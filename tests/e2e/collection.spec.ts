@@ -47,9 +47,11 @@ test('multi-image work saves independent notes, shared references, restores and 
       },
       [first, second],
     );
-    await app.evaluate(({Menu,BrowserWindow})=>{
-      const item=Menu.getApplicationMenu()!.items.find(i=>i.label==='File')!.submenu!.items.find(i=>i.label==='Open image')!;
-      item.click(item,BrowserWindow.getAllWindows()[0],{} as any);
+    await app.evaluate(({ Menu, BrowserWindow }) => {
+      const item = Menu.getApplicationMenu()!
+        .items.find((i) => i.label === 'File')!
+        .submenu!.items.find((i) => i.label === 'Open file')!;
+      item.click(item, BrowserWindow.getAllWindows()[0], {} as any);
     });
     await expect(page.locator('.image-tile')).toHaveCount(2);
     async function note(text: string) {
@@ -113,8 +115,10 @@ test('multi-image work saves independent notes, shared references, restores and 
     await page.getByRole('button', { name: 'Remove image 1 from work', exact: true }).click();
     await expect(page.getByRole('alert')).toContainText('target or reference');
     await expect(page.locator('.image-tile')).toHaveCount(2);
-    await page.getByRole('button',{name:'Copy all instructions',exact:false}).click();
-    await expect(page.getByRole('status').filter({hasText:'Copied 3 instructions across 2 images.'})).toBeVisible();
+    await page.getByRole('button', { name: 'Copy all instructions', exact: false }).click();
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Copied 3 instructions across 2 images.' }),
+    ).toBeVisible();
     await app.evaluate(({ BrowserWindow }) =>
       BrowserWindow.getAllWindows()[0].setContentSize(860, 620),
     );

@@ -14,6 +14,8 @@ PINTO는 Windows·macOS용 로컬 이미지 지시 편집기입니다. 사용자
 
 ## 구조와 변경 위치
 
+- Document editing (0.4): `src/core/surfaces.ts` defines source context and coordinate units; `src/renderer/document-adapters.ts` renders PDF pages with PDF.js; `src/main/web-surfaces.ts` renders sandboxed local HTML and same-origin local web apps. Schema 4 stores PDF/page or HTML/screen context alongside the cached PNG; schemas 1/2/3 remain supported. Source paths are the edit targets, never the locating PNG. Do not mix PDF points, CSS pixels, and image pixels. No credentials may be imported from another browser or thread0. A web-app action is performed in its own visible window and refreshed; only local HTML uses replayed navigation. See `docs/DOCUMENTS.md` for limits.
+
 - Multi-image work: `src/core/collection.ts` (stable image numbers, shared/reference targets and formatting), `src/main/collections.ts` (atomic collection metadata), `src/renderer/CollectionPanel.tsx` (thumbnails and shared instructions). Collections are stored separately in user data `collections.json`; original single-image document schemas 1/2/3 remain compatible. Never renumber surviving images or silently remove shared references. User-requested shared instructions for explicit image targets are distinct from the retired legacy single-image global instruction field.
 
 - `src/renderer/App.tsx`: 화면 구성, 파일 열기·저장·복사 흐름, 메뉴.

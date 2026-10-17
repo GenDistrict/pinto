@@ -1494,3 +1494,166 @@ kbd {
     display: none;
   }
 }
+.view-edit-switch {
+  display: flex;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 3px;
+  border-radius: 9px;
+}
+.view-edit-switch button {
+  border: 0;
+  background: transparent;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 11px;
+}
+.view-edit-switch button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 1px 3px #26262015;
+  font-weight: 700;
+}
+.document-pages {
+  width: 104px;
+  flex: 0 0 104px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+  padding: 10px;
+  background: var(--surface);
+}
+.document-pages button {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 7px;
+  padding: 5px;
+  margin-bottom: 10px;
+}
+.document-pages button[aria-current='page'] {
+  border-color: var(--accent);
+  background: var(--peach);
+}
+.document-pages img {
+  display: block;
+  width: 100%;
+  height: 85px;
+  object-fit: contain;
+  background: var(--paper);
+}
+.document-pages span {
+  display: block;
+  padding-top: 4px;
+  font-size: 11px;
+}
+.document-pages b {
+  position: absolute;
+  right: 0;
+  top: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  padding: 3px 6px;
+  font-size: 10px;
+}
+.document-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px;
+  min-height: 40px;
+  flex-wrap: wrap;
+  background: var(--surface);
+  font-size: 11px;
+}
+.page-edge-tab {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 0 6px 6px 0;
+  padding: 6px;
+  margin-left: -8px;
+  display: flex;
+}
+.web-url-input {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--surface);
+}
+@media (max-width: 1050px) {
+  .header-actions .notes-toggle span,
+  .file-heading small {
+    display: none;
+  }
+  .view-edit-switch button {
+    padding: 5px 6px;
+  }
+  .app-header {
+    gap: 7px;
+    padding: 0 12px;
+  }
+  .brand-lockup span {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .notes-panel {
+    position: absolute;
+    right: 0;
+    bottom: 40px;
+    max-height: 50vh;
+    width: 100%;
+    z-index: 12;
+    border-radius: 14px 14px 0 0;
+  }
+  .floating-note {
+    left: 8px !important;
+    right: 8px;
+    top: auto !important;
+    bottom: 70px;
+    width: auto !important;
+  }
+  .document-pages {
+    width: 74px;
+    flex-basis: 74px;
+  }
+  .shape-tool span {
+    display: none;
+  }
+}
+.document-controls [hidden] {
+  display: none;
+}
+.collection-panel.is-readonly input,
+.collection-panel.is-readonly .collection-actions,
+.collection-panel.is-readonly details,
+.collection-panel.is-readonly .image-tile > .icon-button,
+.collection-panel.is-readonly .image-strip > .secondary-button {
+  display: none;
+}
+@media (max-width: 1100px) {
+  .open-header span,
+  .close-header span {
+    display: none;
+  }
+}
+.file-kind-badge {
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: var(--peach);
+  padding: 4px 6px;
+  border-radius: 5px;
+}
+.document-clipped {
+  color: var(--accent);
+  flex-basis: 100%;
+  padding: 4px 0;
+}

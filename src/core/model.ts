@@ -1,4 +1,5 @@
 import { tr } from './i18n.mjs';
+import { validateSurface, surfaceInstruction, type Surface } from './surfaces';
 export type Point = { x: number; y: number };
 export type PointTarget = Point & { id: string; kind: 'point' };
 export type RectTarget = Point & { id: string; kind: 'rect'; width: number; height: number };
@@ -8,7 +9,8 @@ export type StrokeTarget = Point & { id: string; kind: 'stroke'; points: Point[]
 export type Target = PointTarget | RectTarget | EllipseTarget | LineTarget | StrokeTarget;
 export type Note = { id: string; text: string; targets: Target[] };
 export type Document = {
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: 1 | 2 | 3 | 4;
+  surface?: Surface;
   id: string;
   name: string;
   sourcePath?: string;
@@ -21,9 +23,16 @@ export type Document = {
   notes: Note[];
 };
 export type OpenDocument = { document: Document; imageUrl: string };
-export type ImageSource = { token: string; name: string; dataUrl: string };
+export type ImageSource = {
+  token: string;
+  name: string;
+  dataUrl: string;
+  kind?: 'image' | 'pdf' | 'html' | 'webapp';
+  surface?: Surface;
+};
 export type Recent = {
   imageCount?: number;
+  itemCount?: number;
   id: string;
   name: string;
   width: number;
@@ -214,7 +223,8 @@ export function targetDescription(target: Target): string {
 export function instructionCount(doc: Document): number {
   return doc.notes.filter((n) => n.text.trim()).length + (doc.globalInstruction.trim() ? 1 : 0);
 }
-export function formatInstructions(doc: Document): string {
+export function formatInstructions(doc: Document, numberOffset = 0): string {
+  if (doc.surface) return surfaceInstruction(doc, targetDescription, numberOffset);
   const lines = [
     tr('m141'),
     tr('m142'),
@@ -257,9 +267,16 @@ function integer(value: unknown): value is number {
 export function validateDocument(value: unknown): asserts value is Document {
   if (
     !record(value) ||
-    (value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3)
+    (value.schemaVersion !== 1 &&
+      value.schemaVersion !== 2 &&
+      value.schemaVersion !== 3 &&
+      value.schemaVersion !== 4)
   )
     throw new Error(tr('m150'));
+  if (value.surface !== undefined) {
+    if (value.schemaVersion !== 4) throw new Error(tr('docInvalid'));
+    validateSurface(value.surface);
+  }
   if (
     !text(value.id, 100) ||
     !value.id ||
@@ -312,7 +329,7 @@ export function validateDocument(value: unknown): asserts value is Document {
       )
         throw new Error(tr('m156'));
       ids.add(t.id);
-      if ((t.kind === 'ellipse' || t.kind === 'line') && value.schemaVersion !== 3)
+      if ((t.kind === 'ellipse' || t.kind === 'line') && value.schemaVersion < 3)
         throw new Error(tr('m157'));
       if (t.kind === 'line') {
         const a = t.start,

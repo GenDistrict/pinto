@@ -56,6 +56,7 @@ test('welcome, point, rectangle, multiple targets, copy and export', async () =>
   await page.screenshot({ path: path.join(root, 'test-results/pinto-welcome.png') });
   await page.getByRole('button', { name: '예시 이미지로 둘러보기' }).click();
   await expect(page.getByTestId('stage')).toBeVisible();
+  await expect(page.locator('.busy-overlay')).toHaveCount(0);
   const p = await at(400, 350);
   await page.mouse.click(p.x, p.y);
   await page

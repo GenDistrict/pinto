@@ -5,6 +5,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { DocumentStore, atomicWrite } from './storage';
 import { Collections } from './collections';
+import { snapshotSurface, localWebUrl, openWebLogin, sameSignature } from './web-surfaces';
+import { validateSurface, validateActions, type Surface, type LiveAction } from '../core/surfaces';
 import {
   MAX_IMAGES,
   formatCollectionInstructions,
@@ -65,6 +67,10 @@ async function collectionView(): Promise<CollectionView | null> {
       name: doc.name,
       thumbnail,
       noteCount: instructionCount(doc),
+      ...(doc.surface ? { notes: doc.notes } : {}),
+      kind: doc.surface?.kind,
+      source: doc.surface?.path,
+      page: doc.surface?.page,
     });
   }
   return { collection, images };
@@ -90,16 +96,19 @@ async function recentWorks() {
     if (seen.has(c.id)) continue;
     seen.add(c.id);
     let count = c.instructions.filter((r) => r.text.trim()).length;
+    let documentWork = false;
     for (const image of c.images) {
       try {
-        count += instructionCount(await store.readDocument(image.id));
+        const document = await store.readDocument(image.id);
+        count += instructionCount(document);
+        documentWork ||= !!document.surface;
       } catch {
         /* Keep the group discoverable; opening reports the missing image. */
       }
     }
     result.push({
       ...entry,
-      imageCount: c.images.length,
+      ...(documentWork ? { itemCount: c.images.length } : { imageCount: c.images.length }),
       noteCount: count,
       updatedAt: c.updatedAt && c.updatedAt > entry.updatedAt ? c.updatedAt : entry.updatedAt,
     });
@@ -131,7 +140,7 @@ let allowClose = false,
   rendererReady = false,
   quitting = false;
 let pendingImage = option('--image');
-const imports = new Map<string, { name: string; sourcePath?: string }>();
+const imports = new Map<string, { name: string; sourcePath?: string; surface?: Surface }>();
 const version = app.getVersion();
 const pendingReadyFiles = new Set<string>(
   option('--ready-file') ? [path.resolve(option('--ready-file')!)] : [],
@@ -200,13 +209,40 @@ async function fileSource(file: unknown) {
   const absolute = path.resolve(file),
     stat = await fs.stat(absolute);
   if (!stat.isFile() || stat.size > 64 * 1024 * 1024) throw new Error(tr('m178'));
+  const ext = path.extname(absolute).toLowerCase();
+  if (ext === '.pdf') {
+    const buffer = await fs.readFile(absolute);
+    if (!buffer.subarray(0, 1024).includes(Buffer.from('%PDF-')))
+      throw new Error(tr('docPdfFailed'));
+    const token = randomUUID(),
+      surface: Surface = { kind: 'pdf', path: absolute, page: 1, boxes: [] };
+    imports.set(token, { name: path.basename(absolute), sourcePath: absolute, surface });
+    return {
+      token,
+      name: path.basename(absolute),
+      dataUrl: `data:application/pdf;base64,${buffer.toString('base64')}`,
+      kind: 'pdf' as const,
+      surface,
+    };
+  }
+  if (ext === '.html' || ext === '.htm') {
+    const snap = await snapshotSurface('html', absolute);
+    const result = source(snap.png, path.basename(absolute), absolute);
+    imports.get(result.token)!.surface = snap.surface;
+    return { ...result, kind: 'html' as const, surface: snap.surface };
+  }
   return source(await fs.readFile(absolute), path.basename(absolute), absolute);
 }
 async function pickImage() {
   const result = await dialog.showOpenDialog(win!, {
-    title: tr('m179'),
+    title: tr('docOpen'),
     properties: ['openFile'],
-    filters: [{ name: tr('m180'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+    filters: [
+      {
+        name: tr('docSupported'),
+        extensions: ['png', 'jpg', 'jpeg', 'webp', 'pdf', 'html', 'htm'],
+      },
+    ],
   });
   return result.canceled ? null : fileSource(result.filePaths[0]);
 }
@@ -273,9 +309,14 @@ function setupIPC() {
   handle('pick-image', pickImage);
   handle('pick-images', async () => {
     const result = await dialog.showOpenDialog(win!, {
-      title: tr('m179'),
+      title: tr('docOpen'),
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: tr('m180'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }],
+      filters: [
+        {
+          name: tr('docSupported'),
+          extensions: ['png', 'jpg', 'jpeg', 'webp', 'pdf', 'html', 'htm'],
+        },
+      ],
     });
     if (result.canceled) return [];
     if (result.filePaths.length > MAX_IMAGES)
@@ -294,6 +335,81 @@ function setupIPC() {
     return fileSource(file);
   });
   handle('collection', collectionView);
+  handle('open-webapp', async (url: string) => {
+    const safe = localWebUrl(url),
+      snap = await snapshotSurface('webapp', safe);
+    const opened = await store.create(
+      new URL(safe).host + new URL(safe).pathname,
+      snap.png,
+      snap.width,
+      snap.height,
+      undefined,
+      snap.surface,
+    );
+    await collections.adopt(opened.document.id);
+    return opened;
+  });
+  handle('open-web-window', async (id: string) => {
+    const doc = await store.readDocument(id);
+    if (doc.surface?.kind !== 'webapp') throw new Error(tr('docInvalid'));
+    await openWebLogin(doc.surface.path, !args.includes('--background'));
+  });
+  handle('open-original', async (id: string) => {
+    const doc = await store.readDocument(id);
+    if (!doc.surface) throw new Error(tr('docInvalid'));
+    if (doc.surface.kind === 'webapp') {
+      await openWebLogin(doc.surface.path, !args.includes('--background'));
+      return;
+    }
+    const error = await shell.openPath(doc.surface.path);
+    if (error) throw new Error(error);
+  });
+  handle('interact-document', async (id: string, action?: LiveAction) => {
+    if (!collections.current()?.images.some((i) => i.id === id))
+      throw new Error(tr('batchInvalid'));
+    const original = await store.readDocument(id),
+      s = original.surface;
+    if (!s || s.kind === 'pdf') throw new Error(tr('docInvalid'));
+    const actions = action ? [...(s.actions || []), action] : s.actions || [];
+    validateActions(actions);
+    const snap = await snapshotSurface(s.kind, s.path, actions);
+    const group = collections.current()!;
+    for (const entry of group.images) {
+      const doc = await store.readDocument(entry.id);
+      if (
+        doc.surface?.kind === s.kind &&
+        doc.surface.path === snap.surface.path &&
+        doc.width === snap.width &&
+        doc.height === snap.height &&
+        doc.surface.signature &&
+        sameSignature(doc.surface.signature, snap.surface.signature!) &&
+        JSON.stringify(doc.surface.boxes) === JSON.stringify(snap.surface.boxes)
+      ) {
+        await store.load(doc.id);
+        await store.refreshSurface(doc.id, snap.png, {
+          ...snap.surface,
+          page: doc.surface.page,
+          actions: doc.surface.actions || snap.surface.actions,
+        });
+        thumbnails.delete(doc.id);
+        return store.load(doc.id);
+      }
+    }
+    if (group.images.length >= MAX_IMAGES) throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
+    const page = group.images.reduce((n, i) => Math.max(n, i.number), 0) + 1;
+    const opened = await store.create(
+      s.kind === 'webapp'
+        ? new URL(snap.surface.path).host + new URL(snap.surface.path).pathname
+        : original.name,
+      snap.png,
+      snap.width,
+      snap.height,
+      original.sourcePath,
+      { ...snap.surface, page },
+    );
+    await collections.adopt(opened.document.id, true);
+    return opened;
+  });
   handle('shared-instructions', (id, rules) => collections.rules(id, rules));
   handle('activate-image', async (id: string) => {
     if (!collections.current()?.images.some((i) => i.id === id))
@@ -313,7 +429,16 @@ function setupIPC() {
   );
   handle(
     'create-document',
-    async (input: { token?: unknown; dataUrl?: unknown; append?: boolean }) => {
+    async (input: {
+      token?: unknown;
+      dataUrl?: unknown;
+      append?: boolean;
+      surface?: Surface;
+      width?: number;
+      height?: number;
+      name?: string;
+      keepToken?: boolean;
+    }) => {
       if (input?.append && (collections.current()?.images.length || 0) >= MAX_IMAGES)
         throw new Error(tr('batchLimit', { count: MAX_IMAGES }));
       if (
@@ -328,14 +453,28 @@ function setupIPC() {
       if (!meta) throw new Error(tr('m185'));
       const png = Buffer.from(input.dataUrl.slice(22), 'base64');
       if (mimeOf(png) !== 'image/png' || png.length < 24) throw new Error(tr('m186'));
-      const width = png.readUInt32BE(16),
-        height = png.readUInt32BE(20);
+      const width = input.surface?.kind === 'pdf' ? input.width! : png.readUInt32BE(16),
+        height = input.surface?.kind === 'pdf' ? input.height! : png.readUInt32BE(20);
       if (!width || !height || width > 16000 || height > 16000 || width * height > 64_000_000)
         throw new Error(tr('m001'));
       const image = nativeImage.createFromBuffer(png);
       if (image.isEmpty()) throw new Error(tr('m186'));
-      const opened = await store.create(meta.name, png, width, height, meta.sourcePath);
-      imports.delete(input.token);
+      let surface = meta.surface;
+      if (input.surface) {
+        if (meta.surface?.kind !== 'pdf' || input.surface.kind !== 'pdf')
+          throw new Error(tr('docInvalid'));
+        surface = { ...input.surface, path: meta.surface.path };
+        validateSurface(surface);
+      }
+      const opened = await store.create(
+        surface?.kind === 'pdf' && typeof input.name === 'string' ? input.name : meta.name,
+        png,
+        width,
+        height,
+        meta.sourcePath,
+        surface,
+      );
+      if (!input.keepToken || meta.surface?.kind !== 'pdf') imports.delete(input.token);
       await collections.adopt(opened.document.id, !!input.append);
       return opened;
     },
@@ -435,7 +574,7 @@ function buildMenu() {
         label: tr('m193'),
         submenu: [
           {
-            label: tr('m055'),
+            label: tr('docOpen'),
             accelerator: 'CmdOrCtrl+O',
             click: () => win?.webContents.send('pinto:open-images'),
           },

@@ -1,4 +1,5 @@
 import { tr } from '../core/i18n.mjs';
+import type { LiveAction } from '../core/surfaces';
 import {
   useCallback,
   useEffect,
@@ -52,6 +53,10 @@ type Props = {
   onDelete(id: string): void;
   onDismiss(): void;
   onAdding(): void;
+  mode?: 'view' | 'edit';
+  live?: boolean;
+  onInteract?(action: LiveAction): void;
+  numberOffset?: number;
 };
 type Drag = {
   kind: 'create' | 'draw' | 'move' | 'resize' | 'endpoint' | 'pan';
@@ -82,12 +87,17 @@ export function Canvas({
   onDelete,
   onDismiss,
   onAdding,
+  mode = 'edit',
+  live = false,
+  onInteract,
+  numberOffset = 0,
 }: Props) {
   const stage = useRef<HTMLDivElement>(null),
     svg = useRef<SVGSVGElement>(null),
     editor = useRef<HTMLTextAreaElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 });
+  const [fitMode, setFitMode] = useState<'auto' | 'width' | 'page'>('auto');
   const viewRef = useRef(view),
     fitted = useRef(true),
     previousDoc = useRef('');
@@ -115,8 +125,18 @@ export function Canvas({
       previousDoc.current = doc.id;
       fitted.current = true;
     }
-    if (fitted.current) changeView(fitView(doc.width, doc.height, size.width, size.height));
-  }, [doc.id, doc.width, doc.height, size, changeView]);
+    if (fitted.current) {
+      const widthFit =
+        fitMode === 'width' ||
+        (fitMode === 'auto' &&
+          (live || doc.surface?.kind === 'webapp') &&
+          doc.height > doc.width * 1.6);
+      if (widthFit) {
+        const scale = Math.max(0.02, Math.min(4, (size.width - 64) / doc.width));
+        changeView({ scale, x: (size.width - doc.width * scale) / 2, y: 32 });
+      } else changeView(fitView(doc.width, doc.height, size.width, size.height - 48));
+    }
+  }, [doc.id, doc.width, doc.height, size, changeView, fitMode, live]);
   useEffect(() => {
     if (activeId && !dragging) editor.current?.focus();
   }, [activeId, active?.targets.length, dragging]);
@@ -150,6 +170,15 @@ export function Canvas({
     if (!element) return;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      if (doc.surface && !e.ctrlKey && !e.metaKey) {
+        fitted.current = false;
+        changeView({
+          ...viewRef.current,
+          x: viewRef.current.x - e.deltaX,
+          y: viewRef.current.y - e.deltaY,
+        });
+        return;
+      }
       const rect = element.getBoundingClientRect();
       fitted.current = false;
       const scale = clamp(viewRef.current.scale * Math.exp(-e.deltaY * 0.0015), 0.03, 12);
@@ -159,7 +188,7 @@ export function Canvas({
     };
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);
-  }, [changeView]);
+  }, [changeView, doc.surface]);
   const local = (e: { clientX: number; clientY: number }): Point => {
     const r = svg.current!.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -176,7 +205,7 @@ export function Canvas({
     e.stopPropagation();
     const start = local(e),
       imageStart = screenToImage(start, viewRef.current);
-    if (space || hand || e.button === 1) kind = 'pan';
+    if (space || hand || mode === 'view' || e.button === 1) kind = 'pan';
     else if (kind === 'create' && tool === 'stroke') kind = 'draw';
     if (
       (kind === 'create' || kind === 'draw') &&
@@ -277,6 +306,18 @@ export function Canvas({
     const d = drag.current;
     if (!d) return;
     const point = screenToImage(local(e), d.view);
+    if (
+      d.kind === 'pan' &&
+      !d.moved &&
+      live &&
+      !space &&
+      e.button === 0 &&
+      d.imageStart.x >= 0 &&
+      d.imageStart.y >= 0 &&
+      d.imageStart.x < doc.width &&
+      d.imageStart.y < doc.height
+    )
+      onInteract?.({ kind: 'click', x: Math.round(d.imageStart.x), y: Math.round(d.imageStart.y) });
     if (d.kind === 'draw') {
       d.points.push(clampPoint(point, doc.width, doc.height));
       onCreate(makeStroke(crypto.randomUUID(), d.points, doc.width, doc.height), d.add);
@@ -486,7 +527,7 @@ export function Canvas({
   const editorY = clamp(anchorY + 24, 18, size.height - 248);
   return (
     <div
-      className={`stage ${space || hand ? 'pan-mode' : ''} ${dragging ? 'dragging' : ''} ${adding ? 'adding-mode' : ''}`}
+      className={`stage ${space || hand || mode === 'view' ? 'pan-mode' : ''} ${dragging ? 'dragging' : ''} ${adding ? 'adding-mode' : ''}`}
       ref={stage}
       data-testid="stage"
     >
@@ -518,7 +559,10 @@ export function Canvas({
             preserveAspectRatio="none"
             pointerEvents="none"
           />
-          {doc.notes.map((note, i) => note.targets.map((t) => renderTarget(t, note.id, i)))}
+          {mode === 'edit' &&
+            doc.notes.map((note, i) =>
+              note.targets.map((t) => renderTarget(t, note.id, i + numberOffset)),
+            )}
           {preview && !preview.noteId && preview.target.kind === 'rect' && (
             <rect
               x={preview.target.x}
@@ -572,33 +616,34 @@ export function Canvas({
         </g>
       </svg>
       <div className="view-controls" aria-label={tr('m102')}>
-        {(
-          [
-            ['rect', tr('m103'), Square, tr('m104')],
-            ['ellipse', tr('m105'), Circle, tr('m106')],
-            ['point', tr('m107'), CircleDot, tr('m108')],
-            ['line', tr('m109'), Slash, tr('m110')],
-            ['stroke', tr('m111'), Pencil, tr('m112')],
-          ] as const
-        ).map(([kind, label, Icon, title]) => (
-          <button
-            key={kind}
-            className={`shape-tool ${!hand && tool === kind ? 'selected' : ''}`}
-            aria-label={tr('m113', { p0: label })}
-            aria-pressed={!hand && tool === kind}
-            title={title}
-            onClick={() => {
-              setTool(kind);
-              setHand(false);
-            }}
-          >
-            <Icon size={16} />
-            <span>{label}</span>
-          </button>
-        ))}
+        {mode === 'edit' &&
+          (
+            [
+              ['point', tr('m107'), CircleDot, tr('m108')],
+              ['rect', tr('m103'), Square, tr('m104')],
+              ['ellipse', tr('m105'), Circle, tr('m106')],
+              ['line', tr('m109'), Slash, tr('m110')],
+              ['stroke', tr('m111'), Pencil, tr('m112')],
+            ] as const
+          ).map(([kind, label, Icon, title]) => (
+            <button
+              key={kind}
+              className={`shape-tool ${!hand && tool === kind ? 'selected' : ''}`}
+              aria-label={tr('m113', { p0: label })}
+              aria-pressed={!hand && tool === kind}
+              title={title}
+              onClick={() => {
+                setTool(kind);
+                setHand(false);
+              }}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </button>
+          ))}
         <span className="tool-divider" />
         <button
-          className={hand ? 'selected' : ''}
+          className={hand || mode === 'view' ? 'selected' : ''}
           aria-label={tr('m114')}
           title={tr('m115')}
           onClick={() => {
@@ -640,29 +685,46 @@ export function Canvas({
           <Plus size={16} />
         </button>
         <span className="tool-divider" />
+        {doc.surface && (
+          <button
+            aria-label={tr('docFitWidth')}
+            title={tr('docFitWidth')}
+            onClick={() => {
+              fitted.current = true;
+              setFitMode('width');
+              const scale = Math.max(0.02, Math.min(4, (size.width - 64) / doc.width));
+              changeView({ scale, x: (size.width - doc.width * scale) / 2, y: 32 });
+            }}
+          >
+            ↔
+          </button>
+        )}
         <button
           aria-label={tr('m118')}
           title={tr('m118')}
           onClick={() => {
             fitted.current = true;
-            changeView(fitView(doc.width, doc.height, size.width, size.height));
+            setFitMode('page');
+            changeView(fitView(doc.width, doc.height, size.width, size.height - 48));
           }}
         >
           <Maximize size={17} />
         </button>
       </div>
-      {!active && (
+      {!active && mode === 'edit' && (
         <div className="canvas-hint">
           <span className="tiny-dot" />
-          {hand || space
-            ? tr('m119')
-            : {
-                point: tr('m120'),
-                rect: tr('m121'),
-                ellipse: tr('m122'),
-                line: tr('m123'),
-                stroke: tr('m124'),
-              }[tool]}
+          {live
+            ? tr('docLiveHint')
+            : hand || space
+              ? tr('m119')
+              : {
+                  point: tr('m120'),
+                  rect: tr('m121'),
+                  ellipse: tr('m122'),
+                  line: tr('m123'),
+                  stroke: tr('m124'),
+                }[tool]}
         </div>
       )}
       {adding && (
@@ -674,7 +736,7 @@ export function Canvas({
           </button>
         </div>
       )}
-      {active && !dragging && (
+      {active && !dragging && mode === 'edit' && (
         <div
           className="floating-note"
           style={{ left: editorX, top: editorY }}
@@ -682,7 +744,7 @@ export function Canvas({
         >
           <div className="note-top">
             <span className="number-badge">
-              {doc.notes.findIndex((n) => n.id === activeId) + 1}
+              {doc.notes.findIndex((n) => n.id === activeId) + 1 + numberOffset}
             </span>
             <strong>{tr('m127')}</strong>
             <span className="target-count">{tr('m040', { p0: active.targets.length })}</span>

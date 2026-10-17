@@ -1,4 +1,5 @@
 import { tr } from './i18n.mjs';
+import { surfaceGroupKey } from './surfaces';
 import { formatInstructions, instructionCount, type Document } from './model';
 
 export const MAX_IMAGES = 20;
@@ -17,7 +18,17 @@ export type Collection = {
 };
 export type CollectionView = {
   collection: Collection;
-  images: { id: string; name: string; number: number; thumbnail: string; noteCount: number }[];
+  images: {
+    id: string;
+    name: string;
+    number: number;
+    thumbnail: string;
+    noteCount: number;
+    notes?: Document['notes'];
+    kind?: string;
+    source?: string;
+    page?: number;
+  }[];
 };
 export function validateCollection(value: unknown): asserts value is Collection {
   const c = value as Collection;
@@ -78,13 +89,34 @@ export function collectionInstructionCount(c: Collection, docs: Document[]) {
 export function formatCollectionInstructions(c: Collection, docs: Document[]) {
   validateCollection(c);
   const byId = new Map(docs.map((d) => [d.id, d]));
+  const firstSurface = docs[0]?.surface;
+  const sharedSource =
+    !!firstSurface &&
+    docs.every(
+      (d) =>
+        d.surface &&
+        surfaceGroupKey(d.surface.kind, d.surface.path) ===
+          surfaceGroupKey(firstSurface.kind, firstSurface.path),
+    );
+  let numberOffset = 0;
   const label = (id: string) =>
-    tr('batchImage', { number: c.images.find((i) => i.id === id)!.number });
-  const lines = [tr('batchPrompt'), tr('batchCoordinateHint'), ''];
+    tr(byId.get(id)?.surface ? 'docItem' : 'batchImage', {
+      number: c.images.find((i) => i.id === id)!.number,
+    });
+  const lines = [
+    tr(docs.some((d) => d.surface) ? 'docBatchPrompt' : 'batchPrompt'),
+    tr(docs.some((d) => d.surface) ? 'docBatchCoords' : 'batchCoordinateHint'),
+    '',
+  ];
   for (const image of c.images) {
     const doc = byId.get(image.id);
     if (!doc) throw new Error(tr('batchMissing'));
-    lines.push(`## ${label(image.id)} — ${doc.name}`, formatInstructions(doc), '');
+    lines.push(
+      `## ${label(image.id)} — ${doc.name}`,
+      formatInstructions(doc, sharedSource ? numberOffset : 0),
+      '',
+    );
+    numberOffset += doc.notes.filter((n) => n.text.trim()).length;
   }
   if (c.instructions.some((r) => r.text.trim())) lines.push(`## ${tr('batchShared')}`, '');
   for (const rule of c.instructions.filter((r) => r.text.trim())) {

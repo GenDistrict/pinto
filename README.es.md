@@ -4,9 +4,9 @@
 
 ![PINTO](assets/brand/logo.svg)
 
-**Instrucciones precisas de edición de imágenes para el agente de programación que ya usas en tu equipo.**
+**Instrucciones precisas de edición visual para el agente de programación que ya usas en tu equipo.**
 
-Usa PINTO junto con tu agente en **thread0**, **Claude Code**, **Codex** u otro agente de programación que se ejecute en tu equipo. PINTO es una pequeña aplicación de escritorio para Windows y macOS, con código personalizable, que te ayuda a comunicar exactamente qué quieres cambiar en una imagen.
+Usa PINTO junto con tu agente en **thread0**, **Claude Code**, **Codex** u otro agente de programación que se ejecute en tu equipo. PINTO es una pequeña aplicación de escritorio para Windows y macOS, con código personalizable, que te ayuda a comunicar exactamente qué quieres cambiar en una imagen, un PDF, un archivo HTML o una aplicación web local.
 
 Abre tus imágenes, marca las partes que quieras cambiar y añade notas. PINTO reúne las rutas de los archivos, las coordenadas de los píxeles originales, las zonas seleccionadas y las relaciones entre imágenes de referencia en instrucciones que puedes copiar y pegar en el agente que ya utilizas.
 
@@ -47,7 +47,21 @@ La demostración utiliza la aplicación real, la imagen de ejemplo y las instruc
 
 ## Uso
 
-1. Abre, arrastra o pega una imagen PNG, JPEG o WebP.
+PINTO 0.4 también abre **PDF, HTML local y aplicaciones web locales** en el mismo visor.
+
+- PDF: ruta original, número de página, coordenadas en puntos PDF y texto bajo la marca. Se pide modificar el documento fuente y regenerar el PDF cuando corresponda.
+- HTML: ruta del archivo, coordenadas CSS, selector/texto del elemento y pasos para llegar a una pantalla.
+- Aplicación web: URL actual, coordenadas CSS y pistas del elemento. Se pide editar el código del proyecto, no la captura ni los archivos compilados.
+
+**Ver / Editar** mantiene la página actual. Punto es la primera herramienta y la predeterminada. Los PDF tienen miniaturas a la izquierda y un botón en el borde para ocultarlas. HTML usa flechas y una sola herramienta Mano: arrastrar desplaza y hacer clic interactúa. La lista de instrucciones permite volver a las páginas/pantallas marcadas. Las notas y capturas se guardan y se recuperan al reiniciar.
+
+Usa **Abrir aplicación web** en el inicio o en Más opciones con una URL `http://localhost`, `http://127.0.0.1` o `http://[::1]`. Abre la ventana web de PINTO para iniciar sesión o navegar y después actualiza la captura. No se importan credenciales de thread0 ni de otros navegadores.
+
+Límites: 20 elementos por trabajo (cada página PDF o pantalla guardada cuenta como uno), hasta 20 páginas por PDF, sin PDF protegidos por contraseña. HTML usa recursos locales bajo su carpeta; las aplicaciones web solo permiten solicitudes del mismo origen. No se incluyen CDN externos ni el estado temporal de otro navegador. Las capturas web tienen 1280 CSS px de ancho y hasta 8000 de alto; el recorte se indica. Los clics de HTML se reproducen desde la carga inicial; para usar una aplicación web interactúa en su ventana y actualiza la captura.
+
+![Instrucciones sobre PDF](docs/screenshots/documents-pdf.png)
+
+1. Abre o arrastra imágenes, PDF o HTML; pega imágenes; o abre una URL de una aplicación web local.
 2. Elige **Rectángulo, Elipse, Punto, Línea o Trazo libre**. Haz clic para puntos o arrastra para otras formas. Escribe qué quieres cambiar.
 3. Usa **Añadir objetivo** o Mayús+clic/arrastrar para aplicar una instrucción a varios lugares.
 4. Pulsa **Copiar instrucciones** o Ctrl+Enter / ⌘Enter.

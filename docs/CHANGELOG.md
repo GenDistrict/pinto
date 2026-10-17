@@ -1,5 +1,16 @@
 # PINTO 변경 기록
 
+## 0.4.0 — PDF, HTML and local web apps
+
+- Shared View/Edit workspace for images, PDF pages, local HTML screens and loopback web apps. Point is first/default; PDF thumbnails use an edge toggle; the Hand tool pans or clicks interactive HTML. Fit leaves space for the floating toolbar.
+- PDF instructions carry the original PDF path, page, point coordinates and text under the mark. HTML/web instructions carry CSS coordinates, element selectors/text, navigation steps and the source/project editing target.
+- Source pages/screens and notes persist with schema 4, while earlier image schemas remain readable. Cross-page instruction lists and numbering stay aligned with copied requests.
+- PINTO-owned web sign-in window and same-origin current-route snapshots; other browsers' credentials are not imported. Local HTML resources stay within the selected directory. Limits and supported workflows are documented in all three README languages.
+
+PDF·HTML·로컬 웹앱을 공통 뷰어에서 표시하고 원본 소스 수정 지시를 만들 수 있습니다. 영어·스페인어·한국어 UI와 기존 작업 복원을 유지합니다.
+
+Ahora puedes marcar PDF, HTML y aplicaciones web locales en el visor común. Las instrucciones apuntan al original o al código del proyecto y conservan las unidades de coordenadas de cada formato.
+
 ## 0.3.0 — Multi-image work / Varias imágenes / 여러 이미지
 
 - Open or drop up to 20 images as one work; append images and switch via thumbnails. Keep per-image annotations and undo history during switching.

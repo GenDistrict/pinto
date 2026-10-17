@@ -3,6 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { validateDocument, type Document, type OpenDocument, type Recent } from '../core/model';
+import { validateSurface, type Surface } from '../core/surfaces';
 
 export async function atomicWrite(file: string, value: string | Buffer) {
   await fs.mkdir(path.dirname(file), { recursive: true });
@@ -94,13 +95,15 @@ export class DocumentStore {
     width: number,
     height: number,
     sourcePath?: string,
+    surface?: Surface,
   ): Promise<OpenDocument> {
     return this.serial(async () => {
       const id = randomUUID(),
         directory = path.join(this.root, id),
         now = new Date().toISOString();
       const doc: Document = {
-        schemaVersion: 3,
+        schemaVersion: surface ? 4 : 3,
+        ...(surface ? { surface } : {}),
         id,
         name,
         sourcePath,
@@ -147,6 +150,21 @@ export class DocumentStore {
     if (value.id !== id) throw new Error(tr('m199'));
     value.referencePath = path.join(this.directory(id), 'reference.png');
     return value;
+  }
+  async refreshSurface(id: string, png: Buffer, surface: Surface) {
+    validateSurface(surface);
+    return this.serial(async () => {
+      const doc = this.docs.get(id);
+      if (!doc) throw new Error(tr('m200'));
+      const next = { ...doc, surface };
+      validateDocument(next);
+      await atomicWrite(doc.referencePath, png);
+      await atomicWrite(
+        path.join(this.directory(id), 'annotations.json'),
+        JSON.stringify(next, null, 2),
+      );
+      this.docs.set(id, next);
+    });
   }
   async save(value: unknown): Promise<Document> {
     validateDocument(value);
@@ -219,6 +237,7 @@ export class DocumentStore {
       old.width,
       old.height,
       old.sourcePath,
+      old.surface,
     );
     moved.document.notes = old.notes;
     moved.document.globalInstruction = old.globalInstruction;

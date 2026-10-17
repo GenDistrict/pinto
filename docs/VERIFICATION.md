@@ -1,5 +1,16 @@
 # PINTO 검증 기록
 
+## 0.4.0 — Documents and web apps
+
+Windows x64: type checking, production build and 17 core/catalog/persistence tests passed. Real Electron document scenarios verified a two-page PDF with PDF-point/text context, cross-page note numbering and sidebar navigation; HTML relative resources, navigation, selector context and screen reuse; and a loopback web app with PINTO-owned sign-in, current-route capture, blocked cross-origin requests and distinct URLs even with identical layouts.
+
+The existing multi-image and three-language scenarios passed. The final focused rerun passed all 10 document/image-editor scenarios, giving passing coverage of all 13 Electron scenarios across the runs. The image-editor suite checks shapes, coordinates, copy/export, IME, undo/redo, clipboard/drop, restoration and clear-work behavior. The initial final run exposed an automated click before example-image loading completed; the test now waits for the loading overlay to close before interacting.
+
+A separate installation with global Node.js absent downloaded its private runtime, installed dependencies, built and launched in Spanish. The installed PDF worker, character maps and standard fonts were present. PDF and HTML screenshots were inspected; README/document links resolve locally. macOS was not physically tested in this session.
+
+![PDF editing](screenshots/documents-pdf.png)
+![HTML editing](screenshots/documents-html.png)
+
 ## 0.3.0 — Multi-image work
 
 Windows x64: type check and production build passed; 15 core/catalog/persistence tests passed. All 10 Electron scenarios passed, including the existing single-image editing and localization flows. After the final compact-window styling and native Open-menu integration, both multi-image scenarios were rerun and passed.

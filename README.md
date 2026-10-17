@@ -4,9 +4,9 @@
 
 ![PINTO](assets/brand/logo.svg)
 
-**Precise image-editing instructions for the desktop coding agent you already use.**
+**Precise visual-editing instructions for the desktop coding agent you already use.**
 
-Use PINTO alongside your agent in **thread0**, **Claude Code**, **Codex**, or another coding agent running on your computer. PINTO is a small, source-editable desktop app for Windows and macOS that helps you communicate exactly what you want changed in an image.
+Use PINTO alongside your agent in **thread0**, **Claude Code**, **Codex**, or another coding agent running on your computer. PINTO is a small, source-editable desktop app for Windows and macOS that helps you communicate exactly what you want changed in an image, PDF, HTML file, or local web app.
 
 Open your images, mark the parts you want to change, and add notes. PINTO packages the file paths, original-pixel coordinates, selected regions, and reference-image relationships into instructions you can copy and paste into the agent you already use.
 
@@ -50,7 +50,22 @@ Examples use the actual localized UI, sample image, and notes. See [internationa
 
 ## Use it
 
-1. Open, drop, or paste a PNG, JPEG, or WebP image.
+PINTO 0.4 also opens **PDF, local HTML, and local web apps** in the same viewer. See [document and web editing](docs/DOCUMENTS.md) for the workflow and limits.
+
+| Source | Instructions include |
+| --- | --- |
+| Image | Original pixels and file path |
+| PDF | Original PDF path, page number, PDF-point coordinates, text under the mark |
+| HTML | HTML path, CSS-pixel coordinates, CSS selector/text, navigation steps |
+| Local web app | Current URL, CSS-pixel coordinates, element hints, instruction to edit project source |
+
+Use **View / Edit** without losing the current page. Point is the first/default tool. PDF thumbnails live on the left, with an edge toggle; HTML uses navigation arrows and one Hand tool (drag to pan, click to interact). The instruction list can take you back to a marked page/screen. Notes and snapshots are saved locally and restored on restart.
+
+**Open web app** is on the start screen and in More options. Use an `http://localhost`, `http://127.0.0.1`, or `http://[::1]` URL. **Open web window / Sign in** opens PINTO's own browser window; navigate or sign in there, then refresh the snapshot. It does not import credentials from thread0 or other browsers.
+
+![PDF instructions](docs/screenshots/documents-pdf.png)
+
+1. Open/drop images, PDF or HTML files; paste images; or open a local web-app URL.
 2. Choose **Rectangle, Ellipse, Point, Line, or Freehand**. Click for points; drag for other shapes. Type the change you want.
 3. Use **Add target** or Shift+click/drag for several targets in one instruction.
 4. Click **Copy instructions**, or press Ctrl+Enter / ⌘Enter.

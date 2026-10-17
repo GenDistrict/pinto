@@ -36,6 +36,8 @@ import {
 import { useDocumentHistory } from './history';
 import { Canvas } from './Canvas';
 import { CollectionPanel } from './CollectionPanel';
+import { preparePdf } from './document-adapters';
+import { surfaceGroupKey, type LiveAction } from '../core/surfaces';
 import { MAX_IMAGES, type CollectionView, type SharedInstruction } from '../core/collection';
 
 function Mark({ size = 34 }: { size?: number }) {
@@ -96,9 +98,14 @@ export function App() {
     [recentsOpen, setRecentsOpen] = useState(false);
   const [drop, setDrop] = useState(false);
   const [changingLanguage, setChangingLanguage] = useState(false);
+  const [viewMode, setViewMode] = useState<'view' | 'edit'>('edit');
+  const [pageList, setPageList] = useState(true);
+  const [webDialog, setWebDialog] = useState(false),
+    [webUrl, setWebUrl] = useState('http://localhost:3000');
   const [collection, setCollection] = useState<CollectionView | null>(null);
   const collectionRef = useRef<CollectionView | null>(null);
   const sharedQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const operationDone = useRef<Promise<void>>(Promise.resolve());
   const showCollection = useCallback((value: CollectionView | null) => {
     collectionRef.current = value;
     setCollection(value);
@@ -127,6 +134,36 @@ export function App() {
   };
   const multi =
     !!collection && (collection.images.length > 1 || collection.collection.instructions.length > 0);
+  const documentGroup =
+    !!doc?.surface &&
+    !!collection &&
+    collection.images.every(
+      (i) =>
+        i.kind === doc.surface!.kind &&
+        surfaceGroupKey(i.kind, i.source || '') ===
+          surfaceGroupKey(doc.surface!.kind, doc.surface!.path),
+    );
+  const pdfGroup = documentGroup && doc?.surface?.kind === 'pdf';
+  const live = doc?.surface?.kind === 'html';
+  const webDocument = live || doc?.surface?.kind === 'webapp';
+  const noteRows = doc
+    ? documentGroup && collection
+      ? collection.images.flatMap((image) =>
+          (image.id === doc.id ? doc.notes : image.notes || [])
+            .filter((n) => n.text.trim())
+            .map((note) => ({ note, documentId: image.id, page: image.page, kind: image.kind })),
+        )
+      : doc.notes.map((note) => ({ note, documentId: doc.id, page: undefined, kind: undefined }))
+    : [];
+  const numberOffset =
+    documentGroup && collection
+      ? collection.images
+          .slice(
+            0,
+            collection.images.findIndex((i) => i.id === doc?.id),
+          )
+          .reduce((n, i) => n + (i.notes || []).filter((note) => note.text.trim()).length, 0)
+      : 0;
   const totalInstructions = collection
     ? collection.images.reduce(
         (n, i) => n + (i.id === doc?.id ? instructionCount(doc) : i.noteCount),
@@ -211,6 +248,38 @@ export function App() {
   const refreshRecent = useCallback(async () => setRecent(await window.pinto.recent()), []);
   const importSource = useCallback(
     async (source: ImageSource, append = false) => {
+      if (source.kind === 'pdf') {
+        let first: string | undefined;
+        let index = 0;
+        try {
+          for await (const page of preparePdf(source)) {
+            if (
+              index === 0 &&
+              (append ? collectionRef.current?.images.length || 0 : 0) +
+                (page.surface!.pageCount || 0) >
+                MAX_IMAGES
+            )
+              throw new Error(tr('docPdfLimit'));
+            setBusy(
+              tr('docPdfProgress', { page: page.surface!.page, count: page.surface!.pageCount }),
+            );
+            const value = await window.pinto.createDocument({
+              token: source.token,
+              ...page,
+              append: append || index > 0,
+            });
+            if (!first) first = value.document.id;
+            opened(value);
+            index++;
+          }
+        } finally {
+          if (first) opened(await window.pinto.activateImage(first));
+          await refreshCollection();
+          setInfo(await window.pinto.info());
+          await refreshRecent();
+        }
+        return;
+      }
       const dataUrl = await normalizeImage(source);
       opened(await window.pinto.createDocument({ token: source.token, dataUrl, append }));
       await refreshCollection();
@@ -222,6 +291,10 @@ export function App() {
   const operation = useCallback(
     async (message: string, fn: () => Promise<void>) => {
       if (busyRef.current || copyingRef.current) return;
+      let finish!: () => void;
+      operationDone.current = new Promise<void>((resolve) => {
+        finish = resolve;
+      });
       busyRef.current = true;
       setBusy(message);
       setMenu(false);
@@ -233,6 +306,7 @@ export function App() {
       } finally {
         busyRef.current = false;
         setBusy('');
+        finish();
       }
     },
     [flush, notify],
@@ -287,6 +361,72 @@ export function App() {
       opened(await window.pinto.removeImage(id));
       await refreshCollection();
     });
+  const openNote = (documentId: string, noteId: string) => {
+    if (documentId === docRef.current?.id) {
+      setActiveId(noteId);
+      setAdding(false);
+      return;
+    }
+    void operation(tr('m011'), async () => {
+      opened(await window.pinto.activateImage(documentId));
+      await refreshCollection();
+      setActiveId(noteId);
+      setSidebar(true);
+    });
+  };
+  const removeNote = (documentId: string, noteId: string) => {
+    if (documentId === docRef.current?.id) {
+      deleteNote(noteId);
+      return;
+    }
+    void operation(tr('m011'), async () => {
+      opened(await window.pinto.activateImage(documentId));
+      update((value) => ({ ...value, notes: value.notes.filter((n) => n.id !== noteId) }));
+      await save(docRef.current!);
+      await refreshCollection();
+      setSidebar(true);
+    });
+  };
+  const interact = useCallback(
+    (action?: LiveAction) => {
+      if (!docRef.current) return;
+      void operation(tr('m011'), async () => {
+        const id = docRef.current!.id;
+        opened(await window.pinto.interactDocument(id, action));
+        await refreshCollection();
+      });
+    },
+    [operation, docRef, opened, refreshCollection],
+  );
+  const openWeb = () =>
+    operation(tr('docWebOpen'), async () => {
+      opened(await window.pinto.openWebApp(webUrl));
+      await refreshCollection();
+      await refreshRecent();
+      setWebDialog(false);
+    });
+  const navigationHandler = useRef<(e: KeyboardEvent) => void>(() => {});
+  navigationHandler.current = (e: KeyboardEvent) => {
+    if (isTextInput(e.target) || e.ctrlKey || e.metaKey || composing.current) return;
+    if (live && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+      e.preventDefault();
+      interact({ kind: 'key', key: e.key });
+    } else if (
+      pdfGroup &&
+      collection &&
+      ['PageUp', 'PageDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)
+    ) {
+      e.preventDefault();
+      const at = collection.images.findIndex((i) => i.id === docRef.current?.id);
+      const next = at + (['PageUp', 'ArrowLeft'].includes(e.key) ? -1 : 1);
+      if (collection.images[next]) void switchImage(collection.images[next].id);
+    }
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => navigationHandler.current(e);
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, []);
   const closeImage = async () => {
     if (busyRef.current || copyingRef.current || !docRef.current) return;
     closingDocument.current = true;
@@ -339,7 +479,13 @@ export function App() {
       const count = await window.pinto.copyInstructions(value);
       setSaveState('saved');
       const images = collectionRef.current?.images.length || 1;
-      notify(images > 1 ? tr('batchCopied', { images, count }) : tr('m012', { p0: count }));
+      notify(
+        collectionRef.current?.images.some((i) => i.kind)
+          ? tr('docCopied', { items: images, count })
+          : images > 1
+            ? tr('batchCopied', { images, count })
+            : tr('m012', { p0: count }),
+      );
     } catch (error) {
       notify(errorMessage(error), true);
     } finally {
@@ -397,7 +543,8 @@ export function App() {
   useEffect(
     () =>
       window.pinto.onBeforeClose(() => {
-        void flush()
+        void operationDone.current
+          .then(() => flush())
           .then(() => window.pinto.closeReady())
           .catch((error) => notify(tr('m013', { p0: errorMessage(error) }), true));
       }),
@@ -413,14 +560,15 @@ export function App() {
   useEffect(
     () =>
       window.pinto.onEdit((command) => {
+        if (viewMode === 'view' && !isTextInput(document.activeElement)) return;
         if (isTextInput(document.activeElement)) document.execCommand(command);
         else if (command === 'undo') undo();
         else redo();
       }),
-    [undo, redo],
+    [undo, redo, viewMode],
   );
   useEffect(() => {
-    if (!help && !recentsOpen) return;
+    if (!help && !recentsOpen && !webDialog) return;
     const modal = document.querySelector<HTMLElement>('.modal');
     if (!modal) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -449,7 +597,7 @@ export function App() {
       modal.removeEventListener('keydown', trap);
       if (previous?.isConnected) previous.focus();
     };
-  }, [help, recentsOpen]);
+  }, [help, recentsOpen, webDialog]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.isComposing || composing.current || e.keyCode === 229) return;
@@ -457,15 +605,26 @@ export function App() {
       if (mod && e.key === 'Enter') {
         e.preventDefault();
         void copy();
-      } else if (mod && e.key.toLowerCase() === 'z' && !isTextInput(e.target)) {
+      } else if (
+        viewMode === 'edit' &&
+        mod &&
+        e.key.toLowerCase() === 'z' &&
+        !isTextInput(e.target)
+      ) {
         e.preventDefault();
         if (e.shiftKey) redo();
         else undo();
-      } else if (mod && e.key.toLowerCase() === 'y' && !isTextInput(e.target)) {
+      } else if (
+        viewMode === 'edit' &&
+        mod &&
+        e.key.toLowerCase() === 'y' &&
+        !isTextInput(e.target)
+      ) {
         e.preventDefault();
         redo();
       } else if (e.key === 'Escape') {
-        if (help) setHelp(false);
+        if (webDialog) setWebDialog(false);
+        else if (help) setHelp(false);
         else if (menu) setMenu(false);
         else if (recentsOpen) setRecentsOpen(false);
         else if (adding) setAdding(false);
@@ -502,6 +661,8 @@ export function App() {
     help,
     menu,
     recentsOpen,
+    viewMode,
+    webDialog,
     adding,
     dismiss,
     activeId,
@@ -618,8 +779,12 @@ export function App() {
         <div className="file-heading">
           {doc ? (
             <>
-              <FileImage size={16} />
-              <span title={doc.name}>{doc.name}</span>
+              {doc.surface ? (
+                <b className="file-kind-badge">{doc.surface.kind.toUpperCase()}</b>
+              ) : (
+                <FileImage size={16} />
+              )}
+              <span title={doc.surface?.path || doc.name}>{doc.name}</span>
               <small>
                 {doc.width} × {doc.height}
               </small>
@@ -629,8 +794,25 @@ export function App() {
           )}
         </div>
         <div className="header-actions">
+          {doc && (
+            <div className="view-edit-switch" role="group" aria-label={tr('docMode')}>
+              <button
+                aria-pressed={viewMode === 'view'}
+                onClick={() => {
+                  dismiss();
+                  setViewMode('view');
+                }}
+              >
+                {tr('docView')}
+              </button>
+              <button aria-pressed={viewMode === 'edit'} onClick={() => setViewMode('edit')}>
+                {tr('docEdit')}
+              </button>
+            </div>
+          )}
           <button
             className="secondary-button open-header"
+            aria-label={tr('m021')}
             onClick={() => void openImage()}
             title={tr('m020', { p0: command })}
           >
@@ -649,17 +831,18 @@ export function App() {
                 <ImagePlus size={18} />
               </button>
               <button
-                className="secondary-button"
+                className="secondary-button close-header"
+                aria-label={tr(multi ? 'batchClose' : doc.surface ? 'docClose' : 'm023')}
                 onClick={() => void closeImage()}
                 disabled={!!busy || copying}
                 title={tr('m022')}
               >
                 <X size={16} />
-                <span>{tr(multi ? 'batchClose' : 'm023')}</span>
+                <span>{tr(multi ? 'batchClose' : doc.surface ? 'docClose' : 'm023')}</span>
               </button>
               <button
                 className="icon-button"
-                disabled={!history.canUndo}
+                disabled={!history.canUndo || viewMode === 'view'}
                 onClick={undo}
                 aria-label={tr('m024')}
                 title={`${command}+Z`}
@@ -668,7 +851,7 @@ export function App() {
               </button>
               <button
                 className="icon-button"
-                disabled={!history.canRedo}
+                disabled={!history.canRedo || viewMode === 'view'}
                 onClick={redo}
                 aria-label={tr('m025')}
               >
@@ -683,7 +866,7 @@ export function App() {
                 <List size={16} />
                 <span>
                   {tr('m027')}
-                  {doc.notes.length}
+                  {documentGroup ? noteRows.length : doc.notes.length}
                 </span>
               </button>
               <button
@@ -707,9 +890,10 @@ export function App() {
           </button>
         </div>
       </header>
-      {doc && multi && collection && (
+      {doc && multi && collection && !documentGroup && (
         <CollectionPanel
           key={collection.collection.id}
+          readOnly={viewMode === 'view'}
           view={collection}
           active={doc.id}
           busy={!!busy || copying}
@@ -721,9 +905,100 @@ export function App() {
       )}
       {doc ? (
         <main className="editor-layout">
+          {pdfGroup && pageList && collection && (
+            <nav className="document-pages" aria-label={tr('docPages')}>
+              {collection.images.map((i) => (
+                <button
+                  key={i.id}
+                  aria-label={tr('docPage', { page: i.page })}
+                  aria-current={i.id === doc.id ? 'page' : undefined}
+                  disabled={!!busy}
+                  onClick={() => void switchImage(i.id)}
+                >
+                  <img src={i.thumbnail} alt="" />
+                  <span>{i.page}</span>
+                  {i.noteCount > 0 && <b>{i.noteCount}</b>}
+                </button>
+              ))}
+            </nav>
+          )}
           <div className="workspace">
+            {(pdfGroup || webDocument) && (
+              <div className="document-controls">
+                {doc.surface?.fullHeight && doc.surface.fullHeight > doc.height && (
+                  <small className="document-clipped" role="status">
+                    {tr('docClipped', { height: doc.height, total: doc.surface.fullHeight })}
+                  </small>
+                )}
+                {pdfGroup && (
+                  <button
+                    className="page-edge-tab"
+                    aria-label={tr('docPages')}
+                    aria-expanded={pageList}
+                    onClick={() => setPageList(!pageList)}
+                  >
+                    <List size={16} />
+                  </button>
+                )}
+                <button
+                  className="icon-button"
+                  aria-label={tr('docPrevious')}
+                  hidden={doc.surface?.kind === 'webapp'}
+                  disabled={!!busy || (!live && collection!.images[0].id === doc.id)}
+                  onClick={() => {
+                    if (live) interact({ kind: 'key', key: 'ArrowLeft' });
+                    else {
+                      const at = collection!.images.findIndex((i) => i.id === doc.id);
+                      void switchImage(collection!.images[at - 1].id);
+                    }
+                  }}
+                >
+                  ←
+                </button>
+                <span>
+                  {tr(pdfGroup ? 'docPage' : 'docScreen', { page: doc.surface!.page })}
+                  {pdfGroup ? ` / ${doc.surface!.pageCount}` : ''}
+                </span>
+                <button
+                  className="icon-button"
+                  aria-label={tr('docNext')}
+                  hidden={doc.surface?.kind === 'webapp'}
+                  disabled={!!busy || (!live && collection!.images.at(-1)!.id === doc.id)}
+                  onClick={() => {
+                    if (live) interact({ kind: 'key', key: 'ArrowRight' });
+                    else {
+                      const at = collection!.images.findIndex((i) => i.id === doc.id);
+                      void switchImage(collection!.images[at + 1].id);
+                    }
+                  }}
+                >
+                  →
+                </button>
+                {webDocument && (
+                  <button className="text-button" disabled={!!busy} onClick={() => interact()}>
+                    {tr('docRefresh')}
+                  </button>
+                )}
+                {doc.surface?.kind === 'webapp' && (
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      void window.pinto
+                        .openWebWindow(doc.id)
+                        .catch((e) => notify(errorMessage(e), true))
+                    }
+                  >
+                    {tr('docWebLogin')}
+                  </button>
+                )}
+              </div>
+            )}
             <Canvas
               key={doc.id}
+              mode={viewMode}
+              live={live}
+              onInteract={interact}
+              numberOffset={numberOffset}
               doc={doc}
               imageUrl={imageUrl}
               activeId={activeId}
@@ -759,8 +1034,15 @@ export function App() {
             <div className="handoff-guide">
               <Copy size={18} />
               <div>
-                <strong>{tr('m030')}</strong>
-                <p>{tr('m031')}</p>
+                <strong>{tr(doc.surface ? 'docSourceHint' : 'm030')}</strong>
+                <p>
+                  {tr(doc.surface ? (webDocument ? 'docNetworkHint' : 'docPdfLocation') : 'm031', {
+                    page: doc.surface?.page,
+                    count: doc.surface?.pageCount,
+                    width: doc.width,
+                    height: doc.height,
+                  })}
+                </p>
               </div>
               <button
                 className="secondary-button"
@@ -776,12 +1058,12 @@ export function App() {
               </button>
             </div>
           </div>
-          {sidebar && (
+          {sidebar && viewMode === 'edit' && (
             <aside className="notes-panel">
               <div className="panel-header">
                 <h2>
                   {tr('m034')}
-                  <span>{doc.notes.length}</span>
+                  <span>{noteRows.length}</span>
                 </h2>
                 <button
                   className="icon-button small"
@@ -809,23 +1091,20 @@ export function App() {
                     <small>{tr('m038')}</small>
                   </details>
                 )}
-                {doc.notes.length ? (
-                  doc.notes.map((note, i) => (
+                {noteRows.length ? (
+                  noteRows.map(({ note, documentId, page, kind }, i) => (
                     <div
                       className={`note-list-item ${activeId === note.id ? 'active' : ''}`}
                       key={note.id}
                     >
-                      <button
-                        className="note-select"
-                        onClick={() => {
-                          setActiveId(note.id);
-                          setAdding(false);
-                        }}
-                      >
+                      <button className="note-select" onClick={() => openNote(documentId, note.id)}>
                         <span className="number-badge">{i + 1}</span>
                         <div>
                           <p>{note.text.trim() || tr('m039')}</p>
                           <small>
+                            {page && (
+                              <>{tr(kind === 'pdf' ? 'docPage' : 'docScreen', { page })} · </>
+                            )}
                             {note.targets.length > 1
                               ? tr('m040', { p0: note.targets.length })
                               : {
@@ -841,7 +1120,7 @@ export function App() {
                       <button
                         className="list-delete"
                         aria-label={tr('m046', { p0: i + 1 })}
-                        onClick={() => deleteNote(note.id)}
+                        onClick={() => removeNote(documentId, note.id)}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -920,7 +1199,7 @@ export function App() {
             <div className="welcome-buttons">
               <button className="primary-button" onClick={() => void openImage()}>
                 <ImagePlus size={18} />
-                {tr('m055')}
+                {tr('docOpen')}
                 <ArrowRight size={17} />
               </button>
               <button className="secondary-button" onClick={() => void pasteImage()}>
@@ -928,10 +1207,13 @@ export function App() {
                 {tr('m056')}
                 <kbd>{command} V</kbd>
               </button>
+              <button className="secondary-button" onClick={() => setWebDialog(true)}>
+                {tr('docWebOpen')}
+              </button>
             </div>
             <p className="drop-instruction">
-              {tr('m057')}
-              <span>PNG · JPG · WEBP</span>
+              {tr('docFilesHint')}
+              <span>PNG · JPG · WEBP · PDF · HTML</span>
             </p>
           </div>
           <button className="sample-link" onClick={() => void openExample()}>
@@ -959,6 +1241,7 @@ export function App() {
                     <span>
                       <strong>{r.name}</strong>
                       <small>
+                        {r.itemCount && <>{tr('docItems', { count: r.itemCount })} · </>}
                         {r.imageCount && <>{tr('batchImages', { count: r.imageCount })} · </>}
                         {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', {
                           count: r.noteCount,
@@ -1015,14 +1298,62 @@ export function App() {
           {tr('m067')}
         </button>
       </footer>
+      {webDialog && (
+        <div className="modal-backdrop">
+          <section className="modal" role="dialog" aria-label={tr('docWebOpen')}>
+            <h2>{tr('docWebOpen')}</h2>
+            <p>{tr('docWebHint')}</p>
+            <input
+              className="web-url-input"
+              aria-label={tr('docWebUrl')}
+              value={webUrl}
+              onChange={(e) => setWebUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void openWeb();
+              }}
+            />
+            <p>{tr('docNetworkHint')}</p>
+            <div className="welcome-buttons">
+              <button className="secondary-button" onClick={() => setWebDialog(false)}>
+                {tr('m077')}
+              </button>
+              <button className="primary-button" onClick={() => void openWeb()}>
+                {tr('docWebOpen')}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {menu && (
         <>
           <div className="menu-scrim" onClick={() => setMenu(false)} />
           <div className="app-menu">
+            <button
+              onClick={() => {
+                setMenu(false);
+                setWebDialog(true);
+              }}
+            >
+              <FolderOpen size={16} />
+              {tr('docWebOpen')}
+            </button>
             <button onClick={() => void showRecents()}>
               <FileImage size={16} />
               {tr('m068')}
             </button>
+            {doc?.surface && (
+              <button
+                onClick={() => {
+                  setMenu(false);
+                  void window.pinto
+                    .openOriginal(doc.id)
+                    .catch((e) => notify(errorMessage(e), true));
+                }}
+              >
+                <FolderOpen size={16} />
+                {tr('docOpenOriginal')}
+              </button>
+            )}
             <button disabled={!doc} onClick={() => void exportText()}>
               <ArrowDownToLine size={16} />
               {tr('m069')}
@@ -1164,6 +1495,7 @@ export function App() {
                         <span>
                           <strong>{r.name}</strong>
                           <small>
+                            {r.itemCount && <>{tr('docItems', { count: r.itemCount })} · </>}
                             {r.imageCount && <>{tr('batchImages', { count: r.imageCount })} · </>}
                             {tr(r.noteCount === 1 ? 'notesOne' : 'notesOther', {
                               count: r.noteCount,

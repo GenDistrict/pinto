@@ -1,5 +1,6 @@
 import type { AppInfo, Bootstrap, Document, ImageSource, OpenDocument, Recent } from './model';
 import type { CollectionView, SharedInstruction } from './collection';
+import type { Surface, LiveAction } from './surfaces';
 export interface PintoAPI {
   bootstrap(): Promise<Bootstrap>;
   info(): Promise<AppInfo>;
@@ -7,6 +8,10 @@ export interface PintoAPI {
   pickImage(): Promise<ImageSource | null>;
   pickImages(): Promise<{ token: string; name: string }[]>;
   readPickedImage(token: string): Promise<ImageSource>;
+  openWebApp(url: string): Promise<OpenDocument>;
+  interactDocument(id: string, action?: LiveAction): Promise<OpenDocument>;
+  openWebWindow(id: string): Promise<void>;
+  openOriginal(id: string): Promise<void>;
   collection(): Promise<CollectionView | null>;
   activateImage(id: string): Promise<OpenDocument>;
   removeImage(id: string): Promise<OpenDocument>;
@@ -18,6 +23,11 @@ export interface PintoAPI {
     token: string;
     dataUrl: string;
     append?: boolean;
+    surface?: Surface;
+    width?: number;
+    height?: number;
+    name?: string;
+    keepToken?: boolean;
   }): Promise<OpenDocument>;
   saveDocument(doc: Document): Promise<void>;
   closeDocument(): Promise<void>;
